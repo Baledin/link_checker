@@ -11,6 +11,7 @@ def main():
     argParser = argparse.ArgumentParser()
     argParser.add_argument("--url", "-u", help="The base URL that you want to check")
     argParser.add_argument("--depth", "-d", help="Maximum degrees of separation of pages to crawl", type=int, default=1)
+    argParser.add_argument("--headers", help="Alternative headers to use with requests.get()")
     args = argParser.parse_args()
 
     initialize_db(db_connect())
