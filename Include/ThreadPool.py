@@ -9,7 +9,7 @@ if IS_PY2:
 else:
     from queue import Queue
 
-from ThreadWorker import ThreadWorker
+from Include.ThreadWorker import ThreadWorker
 
 
 class ThreadPool:
