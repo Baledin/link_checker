@@ -9,10 +9,16 @@ import urllib
 
 def main():
     argParser = argparse.ArgumentParser()
-    argParser.add_argument("--url", "-u", help="The base URL that you want to check")
+    argParser.add_argument("url", help="The base URL that you want to check")
     argParser.add_argument("--depth", "-d", help="Maximum degrees of separation of pages to crawl", type=int, default=1)
-    argParser.add_argument("--headers", help="Alternative headers to use with requests.get()")
+    argParser.add_argument("--user-agent", "-u", help="Alternative User-Agent to use with requests.get() headers")
     args = argParser.parse_args()
+
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
+    }
+
 
     initialize_db(get_db())
 
