@@ -1,6 +1,5 @@
 import link_checker
 import requests
-import urllib
 
 url = "https://www.sos.wa.gov/library"
 headers = {
