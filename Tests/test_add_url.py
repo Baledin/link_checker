@@ -1,11 +1,12 @@
 import link_checker
 
-db = link_checker.getDb()
+lc = link_checker
+db = lc.get_db()
 
 # Initialize if not already set
-link_checker.initialize_db(db)
+lc.initialize_db(db)
 
 for i in range(3):
-    print(link_checker.add_url(db, "https://www.sos.wa.gov"))
+    print(lc.add_url(db, "https://www.sos.wa.gov"))
 
 db.close()

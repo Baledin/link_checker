@@ -1,15 +1,21 @@
 import link_checker
 
-db = link_checker.getDb()
+lc = link_checker
+db = lc.get_db()
 
 # Initialize if not already set
-link_checker.initialize_db(db)
+lc.initialize_db(db)
 
-url_id = link_checker.add_url(db, "https://www.sos.wa.gov")
+url_id = lc.add_url(db, "https://www.sos.wa.gov")
 
 print("url_id: %d" % url_id)
 
 for i in range(3):
-    print(link_checker.add_link(db, url_id, url_id))
+    print(lc.add_link(db, url_id, url_id))
+
+c = db.cursor()
+c.execute(''' SELECT url_count FROM links WHERE parent_id=? AND child_id=? ''', [url_id, url_id])
+result = c.fetchone()
+assert result[0] == 3, "Incorrect url_count"
 
 db.close()
