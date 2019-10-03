@@ -14,11 +14,10 @@ def main():
     argParser.add_argument("--headers", help="Alternative headers to use with requests.get()")
     args = argParser.parse_args()
 
-    initialize_db(db_connect())
+    initialize_db(get_db())
 
-def db_connect():
-    db = sqlite3.connect('tmp_links.db')
-    return db
+def get_db():
+    return sqlite3.connect('tmp_links.db')
 
 def initialize_db(db):
     # Create url table if not exists
