@@ -33,13 +33,13 @@ def initialize_db(db):
     # Create links table if not exists
     cursor.execute(''' CREATE TABLE IF NOT EXISTS links (
         parent_id INTEGER, 
-        child_id INTEGER, 
+        child_id INTEGER,
+        url_count INTEGER,
         PRIMARY KEY(parent_id, child_id), 
         FOREIGN KEY (parent_id) REFERENCES url (url_id), 
         FOREIGN KEY (child_id) REFERENCES url (url_id)); ''')
     cursor.execute(''' CREATE UNIQUE INDEX IF NOT EXISTS mapping ON links(parent_id, child_id); ''')
     db.commit()
-    db.close()
 
     return
 
@@ -56,16 +56,42 @@ def get_anchor_links(base, content):
     return links
 
 def add_url(db, url):
-    cursor = db.cursor()
-    cursor.execute(''' INSERT INTO url (url) VALUES (?); ''', [url])
-    print(cursor.lastrowid)
-    db.commit()
-    db.close()
+    try:
+        cursor = db.cursor()
+        cursor.execute(''' SELECT url_id FROM url WHERE url=? ''', [url])
+        result = cursor.fetchone()
+        print(result)
+        if result is None:
+            cursor.execute(''' INSERT INTO url (url) VALUES (?); ''', [url])
+            db.commit()
+            return cursor.lastrowid
+        else:
+            return result[0]
+    except sqlite3.IntegrityError:
+        # value already exists, skip
+        pass
+    except sqlite3.Error as e:
+        print("Database error: %s" % e)
+
+    return 0
 
 def add_link(db, parent, child):
-    cursor = db.cursor()
-    cursor.execute(''' INSERT INTO links (parent_id, child_id) VALUES (?, ?); ''', [parent, child])
-    db.commit()
-    db.close()
+    try:
+        cursor = db.cursor()
+        cursor.execute(''' SELECT url_count FROM links WHERE parent_id=? AND child_id=? ''', [parent, child])
+        result = cursor.fetchone()
+        if result is None:
+            cursor.execute(''' INSERT INTO links (parent_id, child_id, url_count) VALUES (?, ?, ?); ''', [parent, child, 1])
+        else:
+            cursor.execute(''' UPDATE links SET url_count=? WHERE parent_id=? AND child_id=? ''', [result[0] + 1, parent, child])
+        db.commit()
+        return True
+    except sqlite3.IntegrityError:
+        # value already exists, skip
+        pass
+    except sqlite3.Error as e:
+        print("Database error: %s" %e)
+
+    return False
 
 main()
