@@ -1,11 +1,10 @@
 import argparse
-from io import StringIO
-from lxml import etree
+from bs4 import BeautifulSoup
 import requests
 import sqlite3
 import Include.ThreadPool
 import Include.ThreadWorker
-import urllib
+from urllib import parse
 
 def main():
     argParser = argparse.ArgumentParser()
@@ -48,15 +47,15 @@ def initialize_db(db):
 
     return
 
-def check_url():
-    return
+def check_url(url):
+    is_valid = parse.urlparse(url)
+    return is_valid
 
 def get_anchor_links(base, content):
-    html_parser = etree.HTMLParser()
-    tree = etree.parse(StringIO(content), parser=html_parser)
+    soup = BeautifulSoup(content, "html.parser")
     
-    refs = tree.xpath("//a")
-    links = [urllib.parse.urljoin(base, link.get('href', '')) for link in refs]
+    refs = soup.find_all("a", href=True)
+    links = [parse.urljoin(base, a['href']) for a in refs]
 
     return links
 
