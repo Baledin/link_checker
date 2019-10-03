@@ -5,6 +5,7 @@ import sqlite3
 import Include.ThreadPool
 import Include.ThreadWorker
 from urllib import parse
+import validators
 
 def main():
     argParser = argparse.ArgumentParser()
@@ -47,15 +48,27 @@ def initialize_db(db):
 
     return
 
-def check_url(url):
-    is_valid = parse.urlparse(url)
-    return is_valid
+def validate_url(url):
+    try:
+        # remove fragments from url and validate
+        result = parse.urlsplit(url).geturl()
+        if validators.url(result):
+            return result
+        else:
+            return None
+    except Exception as ex:
+        print(str(ex))
+        print("URL is malformed: %s" % url)
+        return None
 
 def get_anchor_links(base, content):
     soup = BeautifulSoup(content, "html.parser")
     
+    links = []
     refs = soup.find_all("a", href=True)
-    links = [parse.urljoin(base, a['href']) for a in refs]
+    for a in refs:
+        link = parse.urljoin(base, a['href'])
+        links.append(link)
 
     return links
 
