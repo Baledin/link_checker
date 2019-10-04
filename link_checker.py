@@ -1,24 +1,24 @@
 import argparse
+import atexit
 from bs4 import BeautifulSoup
 import requests
 import sqlite3
-import Include.ThreadPool
-import Include.ThreadWorker
+from Include.ThreadPool import ThreadPool
 from urllib import parse
 import validators
+
+pool = ThreadPool(4)
 
 def main():
     argParser = argparse.ArgumentParser()
     argParser.add_argument("url", help="The base URL that you want to check")
     argParser.add_argument("--depth", "-d", help="Maximum degrees of separation of pages to crawl", type=int, default=1)
-    argParser.add_argument("--user-agent", "-u", help="Alternative User-Agent to use with requests.get() headers")
+    argParser.add_argument("--user-agent", "-u", help="Alternative User-Agent to use with requests.get() headers", default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36")
     args = argParser.parse_args()
 
-
     headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
+        "User-Agent": args.user_agent
     }
-
 
     initialize_db(get_db())
 
