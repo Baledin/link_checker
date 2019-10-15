@@ -4,35 +4,93 @@ from bs4 import BeautifulSoup
 import requests
 import sqlite3
 from Include.ThreadPool import ThreadPool
+import urllib3
 from urllib import parse
 import validators
 
+# Ignore SSL warnings, just need to know if page returns result
+requests.urllib3.disable_warnings(requests.urllib3.exceptions.InsecureRequestWarning)
+
 pool = ThreadPool(4)
+base = ""
+headers = ""
+
 
 def main():
+    global base, headers
+
     argParser = argparse.ArgumentParser()
     argParser.add_argument("url", help="The base URL that you want to check")
     argParser.add_argument("--depth", "-d", help="Maximum degrees of separation of pages to crawl. 0 for unlimited depth", type=int, default=1)
-    argParser.add_argument("--user-agent", "-u", help="Alternative User-Agent to use with requests.get() headers", default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36")
+    argParser.add_argument("--user-agent", "-u", help="Alternative User-Agent to use with requests.get() headers", default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36 link_checker/0.9")
+    argParser.add_argument("--base", "-b", help="Base domain for crawling. By default, only the subdomain provided by URL is crawled. By setting Base, you can cover multiple subdomains. Usage: example.com will search forums.example.com, www.example.com, and example.com")
     args = argParser.parse_args()
 
     headers = {
         "User-Agent": args.user_agent
     }
+    
+    if validate_url(args.url):
+        base = args.base if args.base is not None else parse.urlsplit(args.url).hostname
+    
+        initialize_db()
 
-    initialize_db(get_db())
+        add_url(args.url)
 
-def get_db():
-    return sqlite3.connect('tmp_links.db')
+        currentDepth = 0
+        while currentDepth < args.depth:
+            # get unprocessed URLs
+            urls = get_urls()
+            pool.map(process_url, urls)
 
-def initialize_db(db):
+            currentDepth += 1
+            pool.wait_completion()
+        else:
+            urls = get_urls()
+            pool.map(process_url_status, urls)
+
+        pool.wait_completion()
+        
+        # Export report
+        report = get_error_urls()
+        if report is not None:
+            print(report)
+    else:
+        print("Invalid URL paremeter")
+
+def add_url(url):
+    urlId = 0
+    db = get_db()
+    cursor = db.cursor()
+
+    try:    
+        cursor.execute('SELECT url_id FROM url WHERE url=?', [url])
+        result = cursor.fetchone()
+        
+        if result is None:
+            cursor.execute('INSERT INTO url (url) VALUES (?);', [url])
+            db.commit()
+            urlId = cursor.lastrowid
+        else:
+            urlId = result[0]
+    except sqlite3.IntegrityError:
+        # value already exists, skip
+        pass
+    except sqlite3.Error as e:
+        print("Database error: %s" % e)
+    
+    db.close()
+    return urlId
+
+def initialize_db():
+    db = get_db()
     # Create url table if not exists
     cursor = db.cursor()
     cursor.execute(''' CREATE TABLE IF NOT EXISTS url (
         url_id INTEGER PRIMARY KEY, 
         url TEXT NOT NULL, 
         status TEXT); ''')
-    cursor.execute(''' CREATE UNIQUE INDEX IF NOT EXISTS urls ON url(url); ''')
+    cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS urls ON url(url);')
     db.commit()
 
     # Create links table if not exists
@@ -43,65 +101,72 @@ def initialize_db(db):
         PRIMARY KEY(parent_id, child_id), 
         FOREIGN KEY (parent_id) REFERENCES url (url_id), 
         FOREIGN KEY (child_id) REFERENCES url (url_id)); ''')
-    cursor.execute(''' CREATE UNIQUE INDEX IF NOT EXISTS mapping ON links(parent_id, child_id); ''')
+    cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS mapping ON links(parent_id, child_id);')
     db.commit()
+    db.close()
 
     return
 
-def validate_url(url):
-    try:
-        # remove fragments from url and validate
-        result = parse.urlsplit(url).geturl()
-        if validators.url(result):
-            return result
-        else:
-            return None
-    except Exception as ex:
-        print(str(ex))
-        print("URL is malformed: %s" % url)
-        return None
+def get_db():
+    # TODO: use ':memory:' to use a virtual db file in production
+    return sqlite3.connect('tmp_links.db')
 
-def get_anchor_links(base, content):
-    soup = BeautifulSoup(content, "html.parser")
+def get_error_urls():
+    db = get_db()
+    cursor = db.cursor()
+
+    try:
+        cursor.execute(''' SELECT p.url AS 'parent', c.url AS 'child', c.status 
+            FROM links 
+            INNER JOIN url AS p ON parent_id = p.url_id 
+            INNER JOIN url AS c ON child_id = c.url_id 
+            WHERE c.status != 200
+            ORDER BY child
+            ''')
+    except sqlite3.Error as e:
+        print("Database error: %s" % e)
     
-    links = []
-    refs = soup.find_all("a", href=True)
-    for a in refs:
-        link = parse.urljoin(base, a['href'])
-        links.append(link)
+    result = cursor.fetchall()
+    db.close()
 
-    return links
+    return result
 
-def add_url(db, url):
+def get_page(url):
+    class MockResponse:
+        def __init__(self, status_code = 0):
+            self.status_code = status_code
+
     try:
+        return requests.get(url, headers=headers, allow_redirects=True, verify=False)
+    except:
+        return MockResponse()
+
+def get_urls():
+    urls = []
+    try:
+        db = get_db()
+        db.row_factory = lambda cursor, row: row[0]
         cursor = db.cursor()
-        cursor.execute(''' SELECT url_id FROM url WHERE url=? ''', [url])
-        result = cursor.fetchone()
-        print(result)
-        if result is None:
-            cursor.execute(''' INSERT INTO url (url) VALUES (?); ''', [url])
-            db.commit()
-            return cursor.lastrowid
-        else:
-            return result[0]
-    except sqlite3.IntegrityError:
-        # value already exists, skip
-        pass
+        cursor.execute('SELECT url FROM url WHERE status IS NULL ORDER BY url;')
+        urls = cursor.fetchall()
+        db.close()
     except sqlite3.Error as e:
         print("Database error: %s" % e)
 
-    return 0
+    return urls
 
-def add_link(db, parent, child):
+def add_link(parent, child):
     try:
+        db = get_db()
         cursor = db.cursor()
-        cursor.execute(''' SELECT url_count FROM links WHERE parent_id=? AND child_id=? ''', [parent, child])
+        cursor.execute('SELECT url_count FROM links WHERE parent_id=? AND child_id=?', [parent, child])
         result = cursor.fetchone()
         if result is None:
-            cursor.execute(''' INSERT INTO links (parent_id, child_id, url_count) VALUES (?, ?, ?); ''', [parent, child, 1])
+            cursor.execute('INSERT INTO links (parent_id, child_id, url_count) VALUES (?, ?, ?);', [parent, child, 1])
         else:
-            cursor.execute(''' UPDATE links SET url_count=? WHERE parent_id=? AND child_id=? ''', [result[0] + 1, parent, child])
+            cursor.execute('UPDATE links SET url_count=? WHERE parent_id=? AND child_id=?', [result[0] + 1, parent, child])
         db.commit()
+        db.close()
         return True
     except sqlite3.IntegrityError:
         # value already exists, skip
@@ -110,5 +175,65 @@ def add_link(db, parent, child):
         print("Database error: %s" %e)
 
     return False
+
+def parse_content(content):
+    soup = BeautifulSoup(content, "html.parser")
+    
+    links = []
+    refs = soup.find_all("a", href=True)
+    for a in refs:
+        link = parse.urljoin(base, a['href'])
+        if validate_url(link):
+            links.append(link)
+
+    return links
+
+def process_url(url):
+    # Fetch page for each URL, save status_code to database
+    page = get_page(url)
+    update_url_status(url, page.status_code)
+
+    if page.status_code == 200 and "text/html" in page.headers['content-type'] and base in parse.urlsplit(url).hostname:
+        print("Base: %s | Url: %s" % (base, parse.urlsplit(url).hostname))
+        links = parse_content(page.text)
+
+        parentId = add_url(url) # already in Db, returns Id
+
+        for link in links:
+            childId = add_url(link)
+            add_link(parentId, childId)
+
+def process_url_status(url):
+    # Fetch page for each URL, save status_code to database
+    page = get_page(url)
+    update_url_status(url, page.status_code)
+
+def update_url_status(url, status):
+    db = get_db()
+    cursor = db.cursor()
+
+    try:    
+        cursor.execute('UPDATE url SET status=? WHERE url=?;', [status, url])
+        if cursor.rowcount > 0:
+            db.commit()
+    except sqlite3.IntegrityError:
+        # value already exists, skip
+        pass
+    except sqlite3.Error as e:
+        print("Database error: %s" % e)
+    
+    db.close()   
+
+def validate_url(url):
+    try:
+        # remove fragments from url and validate
+        result = parse.urlsplit(url).geturl()
+        return validators.url(result)
+    except Exception as ex:
+        print(str(ex))
+        print("URL is malformed: %s" % url)
+        return False
+
+
 
 main()

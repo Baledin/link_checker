@@ -10,18 +10,17 @@ def main():
     test_validate_url()
 
 def test_add_link():
-    db = lc.get_db()
-
     # Initialize if not already set
-    lc.initialize_db(db)
+    lc.initialize_db()
 
-    url_id = lc.add_url(db, "https://www.sos.wa.gov")
+    url_id = lc.add_url("https://www.sos.wa.gov")
 
     print("url_id: %d" % url_id)
 
     for i in range(3):
-        print(lc.add_link(db, url_id, url_id))
+        print(lc.add_link(url_id, url_id))
 
+    db = lc.get_db()
     c = db.cursor()
     c.execute(''' SELECT url_count FROM links WHERE parent_id=? AND child_id=? ''', [url_id, url_id])
     result = c.fetchone()
@@ -30,26 +29,23 @@ def test_add_link():
     db.close()
 
 def test_add_url():
-    db = lc.get_db()
-
     # Initialize if not already set
-    lc.initialize_db(db)
+    lc.initialize_db()
 
     for i in range(3):
-        print(lc.add_url(db, "https://www.sos.wa.gov"))
-
-    db.close()
+        print(lc.add_url("https://www.sos.wa.gov"))
 
 def test_get_anchor_links():
+    base = "sos.wa.gov"
     url = "https://www.sos.wa.gov/library"
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
     }
 
     page = requests.get(url, headers=headers, allow_redirects=True)
-    html = page.content.decode("utf-8")
+    html = page.text
 
-    print(link_checker.get_anchor_links(url, html))
+    print(lc.parse_content(url, html))
 
 def test_validate_url():
     valid_urls = (
@@ -75,5 +71,6 @@ def test_validate_url():
         assert link_checker.validate_url(url) == None, "%s is not valid" % str(url)
 
     print("validate_url passes")
+
 
 main()
