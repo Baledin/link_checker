@@ -54,7 +54,8 @@ def main():
         # Export report
         report = get_error_urls()
         if report is not None:
-            print(report)
+            with open("report.log", "w") as f:
+                print(report, file=f)
     else:
         print("Invalid URL paremeter")
 

@@ -4,3 +4,4 @@ Scripts/
 pyvenv.cfg
 tmp_links.db
 .vscode/
+*.log
