@@ -41,6 +41,8 @@ def main():
         while currentDepth < args.depth:
             # get unprocessed URLs
             urls = get_urls()
+            if len(urls) == 0:
+                break
             pool.map(process_url, urls)
 
             currentDepth += 1
