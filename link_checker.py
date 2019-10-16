@@ -183,13 +183,14 @@ def add_link(parent, child):
 
     return False
 
-def parse_content(content):
+def parse_content(base, content):
     soup = BeautifulSoup(content, "html.parser")
     
     links = []
     refs = soup.find_all("a", href=True)
     for a in refs:
-        link = parse.urljoin(base, a['href'])
+        link = parse.urljoin(base, a['href'], False)
+        print("Found: " + link)
         if validate_url(link):
             links.append(link)
 
@@ -200,9 +201,9 @@ def process_url(url):
     page = get_page(url)
     update_url_status(url, page.status_code)
 
+    print("Status: %d | Base: %s | Hostname: %s" % (page.status_code, base, parse.urlsplit(url).hostname))
     if page.status_code == 200 and "text/html" in page.headers['content-type'] and base in parse.urlsplit(url).hostname:
-        print("Base: %s | Url: %s" % (base, parse.urlsplit(url).hostname))
-        links = parse_content(page.text)
+        links = parse_content(url, page.text)
 
         parentId = add_url(url) # already in Db, returns Id
 
