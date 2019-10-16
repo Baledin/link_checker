@@ -23,7 +23,7 @@ def main():
     argParser.add_argument("url", help="The base URL that you want to check")
     argParser.add_argument("--depth", "-d", help="Maximum degrees of separation of pages to crawl. 0 for unlimited depth", type=int, default=1)
     argParser.add_argument("--user-agent", "-u", help="Alternative User-Agent to use with requests.get() headers", default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36 link_checker/0.9")
-    argParser.add_argument("--base", "-b", help="Base domain for crawling. By default, only the subdomain provided by URL is crawled. By setting Base, you can cover multiple subdomains. Usage: example.com will search forums.example.com, www.example.com, and example.com")
+    argParser.add_argument("--base", "-b", help="Overrides base domain for crawling. By default, only the subdomain provided by URL is crawled. By setting Base, you can cover multiple subdomains. Usage: example.com will search forums.example.com, www.example.com, and example.com")
     args = argParser.parse_args()
 
     headers = {
@@ -38,20 +38,22 @@ def main():
         add_url(args.url)
 
         currentDepth = 0
-        while currentDepth < args.depth:
+        while args.depth == 0 or currentDepth < args.depth:
+            print("Page depth: %d" % (currentDepth))
             # get unprocessed URLs
             urls = get_urls()
+
             if len(urls) == 0:
                 break
+            
             pool.map(process_url, urls)
-
-            currentDepth += 1
             pool.wait_completion()
+            currentDepth += 1
         else:
+            print("Finishing up")
             urls = get_urls()
             pool.map(process_url_status, urls)
-
-        pool.wait_completion()
+            pool.wait_completion()
         
         # Export report
         report = get_error_urls()
@@ -82,8 +84,9 @@ def add_url(url):
         pass
     except sqlite3.Error as e:
         print("Database error: %s" % e)
-    
-    db.close()
+    finally:
+        db.close()
+
     return urlId
 
 def initialize_db():
@@ -237,7 +240,5 @@ def validate_url(url):
         print(str(ex))
         print("URL is malformed: %s" % url)
         return False
-
-
 
 main()
