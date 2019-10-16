@@ -66,12 +66,13 @@ def add_url(url):
     db = get_db()
     cursor = db.cursor()
 
-    try:    
-        cursor.execute('SELECT url_id FROM url WHERE url=?', [url])
+    try:
+        link = parse.urldefrag(url)
+        cursor.execute('SELECT url_id FROM url WHERE url=?', [link])
         result = cursor.fetchone()
         
         if result is None:
-            cursor.execute('INSERT INTO url (url) VALUES (?);', [url])
+            cursor.execute('INSERT INTO url (url) VALUES (?);', [link])
             db.commit()
             urlId = cursor.lastrowid
         else:
