@@ -19,11 +19,13 @@ headers = ""
 def main():
     global base, headers
 
-    argParser = argparse.ArgumentParser()
+    argParser = argparse.ArgumentParser(description="%(prog)s is a general broken link checker. Returns a list of broken URLs, their parent URL, and number of instances on the parent page.")
     argParser.add_argument("url", help="The base URL that you want to check")
-    argParser.add_argument("--depth", "-d", help="Maximum degrees of separation of pages to crawl. 0 for unlimited depth", type=int, default=1)
-    argParser.add_argument("--user-agent", "-u", help="Alternative User-Agent to use with requests.get() headers", default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36 link_checker/0.9")
+    argParser.add_argument("--depth", "-d", type=int, default=1, help="Maximum degrees of separation of pages to crawl. 0 for unlimited depth")
+    argParser.add_argument("--user-agent", "-u", default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36 link_checker/0.9", help="Alternative User-Agent to use with requests.get() headers")
     argParser.add_argument("--base", "-b", help="Overrides base domain for crawling. By default, only the subdomain provided by URL is crawled. By setting Base, you can cover multiple subdomains. Usage: example.com will search forums.example.com, www.example.com, and example.com")
+    argParser.add_argument("--delay", "-t", type=int, default=0, help="Delay (in seconds) between consecutive website calls. Enabling a delay will slow down the process, but will help to ensure that you do not negatively impact target servers.")
+    argParser.add_argument("--reset", "-r", type=bool, default=False, help="Resets local links database, restarting crawl. Default mode continues where previous crawl completed.")
     args = argParser.parse_args()
 
     headers = {
