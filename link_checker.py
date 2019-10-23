@@ -1,39 +1,35 @@
 import argparse
-import atexit
 from bs4 import BeautifulSoup
+import random
 import requests
 import sqlite3
-from Include.ThreadPool import ThreadPool
-import urllib3
+import time
 from urllib import parse
 import validators
+
+from Include.ThreadPool import ThreadPool
 
 # Ignore SSL warnings, just need to know if page returns result
 requests.urllib3.disable_warnings(requests.urllib3.exceptions.InsecureRequestWarning)
 
 pool = ThreadPool(4)
-base = ""
-headers = ""
+args = None
 
 
 def main():
-    global base, headers
+    global args
 
     argParser = argparse.ArgumentParser(description="%(prog)s is a general broken link checker. Returns a list of broken URLs, their parent URL, and number of instances on the parent page.")
-    argParser.add_argument("url", help="The base URL that you want to check")
-    argParser.add_argument("--depth", "-d", type=int, default=1, help="Maximum degrees of separation of pages to crawl. 0 for unlimited depth")
-    argParser.add_argument("--user-agent", "-u", default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36 link_checker/0.9", help="Alternative User-Agent to use with requests.get() headers")
-    argParser.add_argument("--base", "-b", help="Overrides base domain for crawling. By default, only the subdomain provided by URL is crawled. By setting Base, you can cover multiple subdomains. Usage: example.com will search forums.example.com, www.example.com, and example.com")
-    argParser.add_argument("--delay", "-t", type=int, default=0, help="Delay (in seconds) between consecutive website calls. Enabling a delay will slow down the process, but will help to ensure that you do not negatively impact target servers.")
-    argParser.add_argument("--reset", "-r", action="store_true", help="Resets local links database, restarting crawl. Default (no flag) continues where previous crawl completed.")
+    argParser.add_argument("url", nargs="?", help="The URL(s) to check for link errors.")
+    argParser.add_argument("-d", "--depth", type=int, default=1, help="Maximum degrees of separation of pages to crawl. 0 for unlimited depth")
+    argParser.add_argument("-u", "--user-agent", default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36 link_checker/0.9", help="Alternative User-Agent to use with requests.get() headers")
+    argParser.add_argument("-b", "--base", help="Overrides base domain for crawling. By default, only the subdomain provided by URL is crawled. By setting Base, you can cover multiple subdomains. Usage: example.com will search forums.example.com, www.example.com, and example.com")
+    argParser.add_argument("-t", "--delay", type=int, default=0, help="Delay (in seconds) between consecutive website calls. Enabling a delay will slow down the process, but will help to ensure that you do not negatively impact target servers.")
+    argParser.add_argument("-r", "--reset", action="store_true", help="Resets local links database, restarting crawl. Default (no flag) continues where previous crawl completed.")
     args = argParser.parse_args()
 
-    headers = {
-        "User-Agent": args.user_agent
-    }
-    
     if validate_url(args.url):
-        base = args.base if args.base is not None else parse.urlsplit(args.url).hostname
+        args.base = args.base if args.base is not None else parse.urlsplit(args.url).hostname
     
         initialize_db()
 
