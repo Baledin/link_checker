@@ -1,3 +1,4 @@
+#TODO change URL nargs to + to require at least one response
 import argparse
 from bs4 import BeautifulSoup
 import random
@@ -20,7 +21,7 @@ def main():
     global args
 
     argParser = argparse.ArgumentParser(description="%(prog)s is a general broken link checker. Returns a list of broken URLs, their parent URL, and number of instances on the parent page.")
-    argParser.add_argument("url", nargs="?", help="The URL(s) to check for link errors.")
+    argParser.add_argument("url", nargs="*", help="The URL(s) to check for link errors.")
     argParser.add_argument("-d", "--depth", type=int, default=1, help="Maximum degrees of separation of pages to crawl. 0 for unlimited depth")
     argParser.add_argument("-u", "--user-agent", default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36 link_checker/0.9", help="Alternative User-Agent to use with requests.get() headers")
     argParser.add_argument("-b", "--base", help="Overrides base domain for crawling. By default, only the subdomain provided by URL is crawled. By setting Base, you can cover multiple subdomains. Usage: example.com will search forums.example.com, www.example.com, and example.com")
@@ -28,12 +29,18 @@ def main():
     argParser.add_argument("-r", "--reset", action="store_true", help="Resets local links database, restarting crawl. Default (no flag) continues where previous crawl completed.")
     args = argParser.parse_args()
 
-    if validate_url(args.url):
+    check = True
+
+    for url in args.url:
+        check = check if validate_url(url) else False
+
+    if check:
         args.base = args.base if args.base is not None else parse.urlsplit(args.url).hostname
     
         initialize_db()
 
-        add_url(args.url)
+        for url in args.url:
+            add_url(url)
 
         currentDepth = 0
         while args.depth == 0 or currentDepth < args.depth:
@@ -59,7 +66,7 @@ def main():
             with open("report.log", "w") as f:
                 print(report, file=f)
     else:
-        print("Invalid URL paremeter")
+        print("Invalid URL paremeter provded.")
 
 def add_url(url):
     urlId = 0
