@@ -136,15 +136,25 @@ def get_error_urls():
 
     return result
 
+def get_header(url):
+    headers = {
+        "User-Agent": args.user_agent
+    }
+
+    try:
+        return requests.head(url, headers=headers, allow_redirects=True, verify=False)
+    except:
+        return None
+
 def get_page(url):
-    class MockResponse:
-        def __init__(self, status_code = 0):
-            self.status_code = status_code
+    headers = {
+        "User-Agent": args.user_agent
+    }
 
     try:
         return requests.get(url, headers=headers, allow_redirects=True, verify=False)
     except:
-        return MockResponse()
+        return None
 
 def get_urls():
     urls = []
@@ -194,25 +204,37 @@ def parse_content(base, content):
 
     return links
 
-def process_url(url):
-    # Fetch page for each URL, save status_code to database
-    page = get_page(url)
-    update_url_status(url, page.status_code)
+def process_url(url, get_content = True):
+    # Fetch head or head + contents for each URL, save status_code to database
+    if args.base in parse.urlsplit(url).hostname:
+        page = get_page(url)
+        status = 0 if page is None else page.status_code
+        
+        update_url_status(url, status)
 
-    print("Status: %d | Base: %s | Hostname: %s" % (page.status_code, base, parse.urlsplit(url).hostname))
-    if page.status_code == 200 and "text/html" in page.headers['content-type'] and base in parse.urlsplit(url).hostname:
-        links = parse_content(url, page.text)
+        print("Status: %d | Base: %s | Hostname: %s" % (status, args.base, parse.urlsplit(url).hostname))
+        if (get_content 
+            and status == 200 and 
+            "text/html" in page.headers['content-type']):
 
-        parentId = add_url(url) # already in Db, returns Id
+            links = parse_content(url, page.text)
 
-        for link in links:
-            childId = add_url(link)
-            add_link(parentId, childId)
+            parentId = add_url(url) # Inserts URL if necessary, returns Id
+
+            for link in links:
+                childId = add_url(link)
+                add_link(parentId, childId)
+    else:
+        page = get_header(url)
+        status = 0 if page is None else page.status_code
+
+        update_url_status(url, status)
+    
+    time.sleep(page.elapsed.total_seconds() * random.randint(1, 5))
 
 def process_url_status(url):
-    # Fetch page for each URL, save status_code to database
-    page = get_page(url)
-    update_url_status(url, page.status_code)
+    # Wrapper for process_url, setting parse_content to false
+    process_url(url, False)
 
 def update_url_status(url, status):
     db = get_db()
