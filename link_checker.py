@@ -273,4 +273,5 @@ def validate_url(url):
         print("URL is malformed: %s" % url)
         return False
 
-main()
+if __name__ == "__main__":
+    main()
