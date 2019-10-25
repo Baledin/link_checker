@@ -72,64 +72,59 @@ def main():
     else:
         print("Invalid URL paremeter provded.")
 
-def add_url(url):
-    urlId = 0
-    db = get_db()
-    cursor = db.cursor()
-
+def add_link(parent, child, conn = None):
+    conn = get_connection() if conn is None else conn
     try:
-        link = parse.urldefrag(url)
-        cursor.execute('SELECT url_id FROM url WHERE url=?', [link])
+        cursor = conn.cursor()
+        cursor.execute('SELECT url_count FROM links WHERE parent_id=? AND child_id=?', [parent, child])
         result = cursor.fetchone()
-        
         if result is None:
-            cursor.execute('INSERT INTO url (url) VALUES (?);', [link])
-            db.commit()
-            urlId = cursor.lastrowid
+            cursor.execute('INSERT INTO links (parent_id, child_id, url_count) VALUES (?, ?, ?);', [parent, child, 1])
         else:
-            urlId = result[0]
+            cursor.execute('UPDATE links SET url_count=? WHERE parent_id=? AND child_id=?', [result[0] + 1, parent, child])
+        conn.commit()
+        return True
     except sqlite3.IntegrityError:
         # value already exists, skip
         pass
     except sqlite3.Error as e:
+        print("Database error: %s" %e)
+
+    return False
+
+def add_url(url, conn = None):
+    conn = get_connection() if conn is None else conn
+    cursor = conn.cursor()
+    urlId = 0
+
+    try:
+        link = parse.urldefrag(url).url
+        cursor.execute('SELECT url_id FROM url WHERE url=?', [link])
+        result = cursor.fetchone()
+        
+        if result is None:
+            print("Adding URL '%s' to database" % link)
+            cursor.execute('INSERT INTO url (url) VALUES (?);', [link])
+            conn.commit()
+            urlId = cursor.lastrowid
+        else:
+            print("URL '%s' found in database" % link)
+            urlId = result[0]
+    except sqlite3.IntegrityError as e:
+        print("Database Integrity Error: %s" % e)
+        pass
+    except sqlite3.Error as e:
         print("Database error: %s" % e)
-    finally:
-        db.close()
 
     return urlId
 
-def initialize_db():
-    db = get_db()
-    # Create url table if not exists
-    cursor = db.cursor()
-    cursor.execute(''' CREATE TABLE IF NOT EXISTS url (
-        url_id INTEGER PRIMARY KEY, 
-        url TEXT NOT NULL, 
-        status TEXT); ''')
-    cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS urls ON url(url);')
-    db.commit()
+def get_connection(db_name = 'tmp_links.db'):
+    print("Getting connection: %s" % db_name)
+    return sqlite3.connect(db_name)
 
-    # Create links table if not exists
-    cursor.execute(''' CREATE TABLE IF NOT EXISTS links (
-        parent_id INTEGER, 
-        child_id INTEGER,
-        url_count INTEGER,
-        PRIMARY KEY(parent_id, child_id), 
-        FOREIGN KEY (parent_id) REFERENCES url (url_id), 
-        FOREIGN KEY (child_id) REFERENCES url (url_id)); ''')
-    cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS mapping ON links(parent_id, child_id);')
-    db.commit()
-    db.close()
-
-    return
-
-def get_db():
-    # TODO: use ':memory:' to use a virtual db file in production
-    return sqlite3.connect('tmp_links.db')
-
-def get_error_urls():
-    db = get_db()
-    cursor = db.cursor()
+def get_error_urls(conn = None):
+    conn = get_connection() if conn is None else conn
+    cursor = conn.cursor()
 
     try:
         cursor.execute(''' SELECT p.url AS 'parent', c.url AS 'child', c.status 
@@ -143,7 +138,7 @@ def get_error_urls():
         print("Database error: %s" % e)
     
     result = cursor.fetchall()
-    db.close()
+    conn.close()
 
     return result
 
@@ -167,40 +162,47 @@ def get_page(url):
     except:
         return None
 
-def get_urls():
+def get_urls(conn = None):
+    conn = get_connection() if conn is None else conn
+
     urls = []
     try:
-        db = get_db()
-        db.row_factory = lambda cursor, row: row[0]
-        cursor = db.cursor()
+        conn.row_factory = lambda cursor, row: row[0]
+        cursor = conn.cursor()
         cursor.execute('SELECT url FROM url WHERE status IS NULL ORDER BY url;')
         urls = cursor.fetchall()
-        db.close()
+        conn.close()
     except sqlite3.Error as e:
         print("Database error: %s" % e)
 
     return urls
 
-def add_link(parent, child):
+def initialize_db(conn):
     try:
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute('SELECT url_count FROM links WHERE parent_id=? AND child_id=?', [parent, child])
-        result = cursor.fetchone()
-        if result is None:
-            cursor.execute('INSERT INTO links (parent_id, child_id, url_count) VALUES (?, ?, ?);', [parent, child, 1])
-        else:
-            cursor.execute('UPDATE links SET url_count=? WHERE parent_id=? AND child_id=?', [result[0] + 1, parent, child])
-        db.commit()
-        db.close()
-        return True
-    except sqlite3.IntegrityError:
-        # value already exists, skip
-        pass
-    except sqlite3.Error as e:
-        print("Database error: %s" %e)
+        # Create url table if not exists
+        cursor = conn.cursor()
+        cursor.execute(''' CREATE TABLE IF NOT EXISTS url (
+            url_id INTEGER PRIMARY KEY, 
+            url TEXT NOT NULL, 
+            status TEXT); ''')
+        cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS urls ON url(url);')
+        conn.commit()
 
-    return False
+        # Create links table if not exists
+        cursor.execute(''' CREATE TABLE IF NOT EXISTS links (
+            parent_id INTEGER, 
+            child_id INTEGER,
+            url_count INTEGER,
+            PRIMARY KEY(parent_id, child_id), 
+            FOREIGN KEY (parent_id) REFERENCES url (url_id), 
+            FOREIGN KEY (child_id) REFERENCES url (url_id)); ''')
+        cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS mapping ON links(parent_id, child_id);')
+        conn.commit()
+    except sqlite3.Error as e:
+        print("Database error: %s" % e)
+        return False
+    
+    return True
 
 def parse_content(base, content):
     soup = BeautifulSoup(content, "html.parser")
@@ -215,26 +217,28 @@ def parse_content(base, content):
 
     return links
 
-def process_url(url, get_content = True):
+def process_url(url, get_content = True, conn = None):
+    conn = get_connection() if conn is None else conn
+
     # Fetch head or head + contents for each URL, save status_code to database
-    if args.base in parse.urlsplit(url).hostname:
+    if parse.urlsplit(url).hostname in args.base:
         page = get_page(url)
         status = 0 if page is None else page.status_code
         
         update_url_status(url, status)
 
-        print("Status: %d | Base: %s | Hostname: %s" % (status, args.base, parse.urlsplit(url).hostname))
         if (get_content 
             and status == 200 and 
             "text/html" in page.headers['content-type']):
 
             links = parse_content(url, page.text)
 
-            parentId = add_url(url) # Inserts URL if necessary, returns Id
+            parentId = add_url(url, conn) # Inserts URL if necessary, returns Id
 
             for link in links:
-                childId = add_url(link)
-                add_link(parentId, childId)
+                childId = add_url(link, conn)
+                add_link(parentId, childId, conn)
+                conn.close()
     else:
         page = get_header(url)
         status = 0 if page is None else page.status_code
@@ -247,21 +251,21 @@ def process_url_status(url):
     # Wrapper for process_url, setting parse_content to false
     process_url(url, False)
 
-def update_url_status(url, status):
-    db = get_db()
-    cursor = db.cursor()
+def update_url_status(url, status, conn = None):
+    conn = get_connection() if conn is None else conn
+    cursor = conn.cursor()
 
     try:    
         cursor.execute('UPDATE url SET status=? WHERE url=?;', [status, url])
         if cursor.rowcount > 0:
-            db.commit()
+            conn.commit()
     except sqlite3.IntegrityError:
         # value already exists, skip
         pass
     except sqlite3.Error as e:
         print("Database error: %s" % e)
     
-    db.close()   
+    conn.close()   
 
 def validate_url(url):
     try:

@@ -4,38 +4,84 @@ import requests
 lc = link_checker
 
 def main():
-    test_add_link()
+    # Note, tests are run in order by dependencies
     test_add_url()
-    test_get_anchor_links()
-    test_validate_url()
+    #test_add_link()
+    #test_get_db()
+    #test_get_error_urls()
+    #test_get_header()
+    #test_get_page()
+    #test_get_urls()
+    #test_initialize_db()
+    #test_parse_content()
+    #test_process_url()
+    #test_process_url_status()
+    #test_update_url_status()
+    #test_validate_url()
 
 def test_add_link():
+    print("test_add_link starting")
     # Initialize if not already set
-    lc.initialize_db()
+    conn = lc.get_connection(':memory:')
+    lc.initialize_db(conn)
 
-    url_id = lc.add_url("https://www.sos.wa.gov")
+    url_id = lc.add_url("https://www.sos.wa.gov", conn)
 
     print("url_id: %d" % url_id)
 
-    for i in range(3):
-        print(lc.add_link(url_id, url_id))
+    for _ in range(3):
+        print(lc.add_link(url_id, url_id, conn))
 
-    db = lc.get_db()
-    c = db.cursor()
-    c.execute(''' SELECT url_count FROM links WHERE parent_id=? AND child_id=? ''', [url_id, url_id])
-    result = c.fetchone()
-    assert result[0] == 3, "Incorrect url_count"
+    with conn.cursor() as c:
+        c.execute(''' SELECT url_count FROM links WHERE parent_id=? AND child_id=? ''', [url_id, url_id])
+        result = c.fetchone()
 
-    db.close()
+        conn.close()
+
+    assert result[0] == 3, "Incorrect url_count: %s" % str(result)
+
+    print("test_add_link complete")
 
 def test_add_url():
+    print("test_add_url starting")
     # Initialize if not already set
-    lc.initialize_db()
+    conn = lc.get_connection(':memory:')
+    lc.initialize_db(conn)
+
+    url = "https://www.sos.wa.gov"
 
     for i in range(3):
-        print(lc.add_url("https://www.sos.wa.gov"))
+        url_id = lc.add_url(url, conn)
+        assert url_id == 1, "add_url test failed on pass " % i
 
-def test_get_anchor_links():
+    conn.close()
+    print("test_add_url complete")
+
+def test_get_db():
+    #TODO
+    assert True
+
+def test_get_error_urls():
+    #TODO
+    assert True
+
+def test_get_header():
+    #TODO
+    assert True
+
+def test_get_page():
+    #TODO
+    assert True
+
+def test_get_urls():
+    #TODO
+    assert True
+
+def test_initialize_db():
+    #TODO
+    assert True
+
+def test_parse_content():
     base = "sos.wa.gov"
     url = "https://www.sos.wa.gov/library"
     headers = {
@@ -46,6 +92,18 @@ def test_get_anchor_links():
     html = page.text
 
     print(lc.parse_content(url, html))
+
+def test_process_url():
+    #TODO
+    assert True
+
+def test_process_url_status():
+    #TODO
+    assert True
+
+def test_update_url_status():
+    #TODO
+    assert True
 
 def test_validate_url():
     valid_urls = (
@@ -72,5 +130,5 @@ def test_validate_url():
 
     print("validate_url passes")
 
-
-main()
+if __name__ == "__main__":
+    main()
