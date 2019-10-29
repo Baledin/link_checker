@@ -6,18 +6,17 @@ lc = link_checker
 def main():
     # Note, tests are run in order by dependencies
     test_add_url()
-    #test_add_link()
-    #test_get_db()
-    #test_get_error_urls()
-    #test_get_header()
-    #test_get_page()
-    #test_get_urls()
-    #test_initialize_db()
-    #test_parse_content()
-    #test_process_url()
-    #test_process_url_status()
-    #test_update_url_status()
-    #test_validate_url()
+    test_add_link()
+    test_get_error_urls()
+    test_get_header()
+    test_get_page()
+    test_get_urls()
+    test_initialize_db()
+    test_parse_content()
+    test_process_url()
+    test_process_url_status()
+    test_update_url_status()
+    test_validate_url()
 
 def test_add_link():
     print("test_add_link starting")
@@ -56,10 +55,6 @@ def test_add_url():
 
     conn.close()
     print("test_add_url complete")
-
-def test_get_db():
-    #TODO
-    assert True
 
 def test_get_error_urls():
     #TODO
