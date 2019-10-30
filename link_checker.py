@@ -80,21 +80,21 @@ def main():
 
 def add_link(parent, child, conn = None):
     conn = get_connection() if conn is None else conn
+    cursor = conn.cursor()
+
     try:
-        cursor = conn.cursor()
-        cursor.execute('SELECT url_count FROM links WHERE parent_id=? AND child_id=?', [parent, child])
-        result = cursor.fetchone()
-        if result is None:
-            cursor.execute('INSERT INTO links (parent_id, child_id, url_count) VALUES (?, ?, ?);', [parent, child, 1])
-        else:
-            cursor.execute('UPDATE links SET url_count=? WHERE parent_id=? AND child_id=?', [result[0] + 1, parent, child])
-        conn.commit()
+        logging.info("Updating links table - parent_id: %d | child_id: %d" % (parent, child))
+        cursor.execute('INSERT INTO links (parent_id, child_id, url_count) VALUES (?, ?, ?);', [parent, child, 1])
         return True
     except sqlite3.IntegrityError:
-        # value already exists, skip
-        pass
+        logging.info("Item already exists, updating record.")
+        cursor.execute('UPDATE links SET url_count=url_count+1 WHERE parent_id=? AND child_id=?', [parent, child])
+        return True
     except sqlite3.Error as e:
-        print("Database error: %s" %e)
+        logging.debug("Database error: %s" % e)
+        logging.critical("Database error - ensure database is writable.")
+    finally:
+        conn.commit()
 
     return False
 
@@ -103,29 +103,27 @@ def add_url(url, conn = None):
     cursor = conn.cursor()
     urlId = 0
 
+    link = parse.urldefrag(url).url
+    
     try:
-        link = parse.urldefrag(url).url
+        logging.info("Adding URL '%s' to database." % link)
+        cursor.execute('INSERT INTO url (url) VALUES (?);', [link])
+        conn.commit()
+        urlId = cursor.lastrowid
+    except sqlite3.IntegrityError as e:
+        logging.info("URL '%s' found in database." % link)
         cursor.execute('SELECT url_id FROM url WHERE url=?', [link])
         result = cursor.fetchone()
-        
-        if result is None:
-            print("Adding URL '%s' to database" % link)
-            cursor.execute('INSERT INTO url (url) VALUES (?);', [link])
-            conn.commit()
-            urlId = cursor.lastrowid
-        else:
-            print("URL '%s' found in database" % link)
-            urlId = result[0]
-    except sqlite3.IntegrityError as e:
-        print("Database Integrity Error: %s" % e)
+        urlId = result[0]
         pass
     except sqlite3.Error as e:
-        print("Database error: %s" % e)
+        logging.debug("Database error: %s" % e)
+        logging.critical("Database error - ensure database is writable.")
 
     return urlId
 
 def get_connection(db_name = 'tmp_links.db'):
-    print("Getting connection: %s" % db_name)
+    logging.info("Getting database connection: %s" % db_name)
     return sqlite3.connect(db_name)
 
 def get_error_urls(conn = None):
@@ -184,6 +182,7 @@ def get_urls(conn = None):
     return urls
 
 def initialize_db(conn):
+    logging.info("Initializing database tables")
     try:
         # Create url table if not exists
         cursor = conn.cursor()
@@ -274,13 +273,19 @@ def update_url_status(url, status, conn = None):
     conn.close()   
 
 def validate_url(url):
+    logging.info("Validating URL: %s" % str(url))
     try:
         # remove fragments from url and validate
-        result = parse.urlsplit(url).geturl()
-        return validators.url(result)
+        result = validators.url(parse.urlsplit(url).geturl())
+        if result:
+            logging.info("URL is valid: %s" % url)
+            return True
+        else:
+            logging.info("URL is malformed: %s" % url)
+            logging.debug(result)
+            return False
     except Exception as ex:
-        print(str(ex))
-        print("URL is malformed: %s" % url)
+        logging.debug(ex)
         return False
 
 if __name__ == "__main__":

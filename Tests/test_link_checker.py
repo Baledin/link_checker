@@ -1,10 +1,18 @@
 import link_checker
+import logging
+import random
 import requests
 
+logging.basicConfig(
+    level=logging.DEBUG,
+    filename="link_checker-debug.log", 
+    filemode="w", 
+    format="%(asctime)s\t%(levelname)s\t%(message)s")
 lc = link_checker
 
 def main():
     # Note, tests are run in order by dependencies
+    test_validate_url()
     test_add_url()
     test_add_link()
     test_get_error_urls()
@@ -16,67 +24,90 @@ def main():
     test_process_url()
     test_process_url_status()
     test_update_url_status()
-    test_validate_url()
 
 def test_add_link():
-    print("test_add_link starting")
+    logging.info("***** test_add_link starting *****")
     # Initialize if not already set
     conn = lc.get_connection(':memory:')
     lc.initialize_db(conn)
 
     url_id = lc.add_url("https://www.sos.wa.gov", conn)
 
-    print("url_id: %d" % url_id)
+    r = random.randint(3, 10)
+    logging.info("test_add_link looping %d times." % r)
+    for _ in range(r):
+        lc.add_link(url_id, url_id, conn)
 
-    for _ in range(3):
-        print(lc.add_link(url_id, url_id, conn))
+    c = conn.cursor()
+    c.execute(''' SELECT url_count FROM links WHERE parent_id=? AND child_id=? ''', [url_id, url_id])
+    result = c.fetchone()
+    conn.close()
 
-    with conn.cursor() as c:
-        c.execute(''' SELECT url_count FROM links WHERE parent_id=? AND child_id=? ''', [url_id, url_id])
-        result = c.fetchone()
+    # As add_link iterates counter, result should be equal to number of loops
+    try:
+        assert result[0] == r
+        logging.info("test_add_link passed - %d expected, %d found." % (r, result[0]))
+    except AssertionError as e:
+        logging.error("test_add_link failed - %d expected, %d found." % (r, result[0]))
+        logging.debug(e)
 
-        conn.close()
-
-    assert result[0] == 3, "Incorrect url_count: %s" % str(result)
-
-    print("test_add_link complete")
+    logging.info("***** test_add_link complete *****")
 
 def test_add_url():
-    print("test_add_url starting")
-    # Initialize if not already set
+    logging.info("***** test_add_url starting *****")
+    
+    # Initialize db if not already set
     conn = lc.get_connection(':memory:')
     lc.initialize_db(conn)
 
     url = "https://www.sos.wa.gov"
 
-    for i in range(3):
-        url_id = lc.add_url(url, conn)
-        assert url_id == 1, "add_url test failed on pass " % i
+    r = random.randint(3, 10)
+    logging.info("test_add_url looping %d times." % r)
+    for _ in range(r):
+        try:
+            url_id = lc.add_url(url, conn)
+            assert url_id == 1
+            logging.info("test_add_url passed - url_id = 1 expected, %d found." % (url_id))
+        except AssertionError:
+            logging.info("test_add_url failed - url_id = 1 expected, %d found." % (url_id))
 
     conn.close()
-    print("test_add_url complete")
+    
+    logging.info("***** test_add_url complete *****")
 
 def test_get_error_urls():
+    logging.info("***** test_get_error_urls starting *****")
     #TODO
     assert True
+    logging.info("***** test_get_error_urls complete *****")
 
 def test_get_header():
+    logging.info("***** test_get_header starting *****")
     #TODO
     assert True
+    logging.info("***** test_get_header complete *****")
 
 def test_get_page():
+    logging.info("***** test_get_page starting *****")
     #TODO
     assert True
+    logging.info("***** test_get_page complete *****")
 
 def test_get_urls():
+    logging.info("***** test_get_urls starting *****")
     #TODO
     assert True
+    logging.info("***** test_get_urls complete *****")
 
 def test_initialize_db():
+    logging.info("***** test_initialize_db starting *****")
     #TODO
     assert True
+    logging.info("***** test_initialize_db complete *****")
 
 def test_parse_content():
+    logging.info("***** test_parse_content starting *****")
     base = "sos.wa.gov"
     url = "https://www.sos.wa.gov/library"
     headers = {
@@ -86,21 +117,29 @@ def test_parse_content():
     page = requests.get(url, headers=headers, allow_redirects=True)
     html = page.text
 
-    print(lc.parse_content(url, html))
+    logging.info(lc.parse_content(url, html))
+    logging.info("***** test_parse_content complete *****")
 
 def test_process_url():
+    logging.info("***** test_process_url starting *****")
     #TODO
     assert True
+    logging.info("***** test_process_url complete *****")
 
 def test_process_url_status():
+    logging.info("***** test_process_url_status starting *****")
     #TODO
     assert True
+    logging.info("***** test_process_url_status complete *****")
 
 def test_update_url_status():
+    logging.info("***** test_update_url_status starting *****")
     #TODO
     assert True
+    logging.info("***** test_update_url_status complete *****")
 
 def test_validate_url():
+    logging.info("***** test_validate_url starting *****")
     valid_urls = (
         "http://google.com", 
         "http://localhost:8080", 
@@ -118,12 +157,18 @@ def test_validate_url():
         )
 
     for url in valid_urls:
-        assert link_checker.validate_url(url) != None, "%s is not valid" % str(url)
+        try:
+            assert lc.validate_url(url)
+        except AssertionError as ex:
+            logging.debug(ex)
 
     for url in invalid_urls:
-        assert link_checker.validate_url(url) == None, "%s is not valid" % str(url)
+        try:
+            assert lc.validate_url(url) == False
+        except AssertionError as ex:
+            logging.debug(ex)
 
-    print("validate_url passes")
+    logging.info("***** test_validate_url complete *****")
 
 if __name__ == "__main__":
     main()
