@@ -126,8 +126,7 @@ def get_connection(db_name = 'tmp_links.db'):
     logging.info("Getting database connection: %s" % db_name)
     return sqlite3.connect(db_name)
 
-def get_error_urls(conn = None):
-    conn = get_connection() if conn is None else conn
+def get_error_urls(conn):
     cursor = conn.cursor()
 
     try:
@@ -166,9 +165,7 @@ def get_page(url):
     except:
         return None
 
-def get_urls(conn = None):
-    conn = get_connection() if conn is None else conn
-
+def get_urls(conn):
     urls = []
     try:
         conn.row_factory = lambda cursor, row: row[0]
