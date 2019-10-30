@@ -9,6 +9,7 @@ logging.basicConfig(
     filemode="w", 
     format="%(asctime)s\t%(levelname)s\t%(message)s")
 lc = link_checker
+test_url = "https://www.sos.wa.gov"
 
 def main():
     test_add_link()
@@ -31,7 +32,7 @@ def test_add_link():
     conn = lc.get_connection(':memory:')
     lc.initialize_db(conn)
 
-    url_id = lc.add_url("https://www.sos.wa.gov", conn)
+    url_id = lc.add_url(test_url, conn)
 
     r = random.randint(3, 10)
     logging.info("test_add_link looping %d times." % r)
@@ -59,19 +60,12 @@ def test_add_url():
     # Initialize db if not already set
     conn = lc.get_connection(':memory:')
     lc.initialize_db(conn)
+    url = test_url
 
-    url = "https://www.sos.wa.gov"
+    url_id = lc.add_url(url, conn)
 
-    r = random.randint(3, 10)
-    logging.info("test_add_url looping %d times." % r)
-    for _ in range(r):
-        lc.add_url(url, conn)
-
-    conn.cursor().execute("SELECT * FROM url WHERE url=?", [url])
-    result = conn.cursor().fetchall()
-    print(result)
     try:
-        assert True
+        assert url_id > 0
         logging.info("test_add_url passed - %s added to db." % url)
     except AssertionError:
         logging.info("test_add_url failed - %s not found." % url)

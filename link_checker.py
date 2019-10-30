@@ -111,7 +111,7 @@ def add_url(url, conn = None):
         conn.commit()
         urlId = cursor.lastrowid
     except sqlite3.IntegrityError as e:
-        logging.info("URL '%s' found in database." % link)
+        logging.info("URL '%s' already found in database." % link)
         cursor.execute('SELECT url_id FROM url WHERE url=?', [link])
         result = cursor.fetchone()
         urlId = result[0]
