@@ -14,7 +14,6 @@ test_url = "https://www.sos.wa.gov"
 def main():
     test_add_link()
     test_add_url()
-    exit()
     test_get_error_urls()
     test_get_header()
     test_get_page()
