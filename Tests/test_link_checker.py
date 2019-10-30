@@ -9,7 +9,7 @@ logging.basicConfig(
     filemode="w", 
     format="%(asctime)s\t%(levelname)s\t%(message)s")
 lc = link_checker
-test_url = "https://www.sos.wa.gov"
+test_url = "https://www.sos.wa.gov/library"
 
 def main():
     test_add_link()
