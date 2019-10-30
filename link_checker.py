@@ -51,31 +51,32 @@ def main():
             args.base.add(parse.urlsplit(url).hostname)
             add_url(conn, url)
 
-        conn.close()
-
-        currentDepth = 0
-        while args.depth == 0 or currentDepth < args.depth:
-            print("Page depth: %d" % (currentDepth))
-            # get unprocessed URLs
-            urls = get_urls()
-
-            if len(urls) == 0:
-                break
+        try:
+            currentDepth = 0
+            while args.depth == 0 or currentDepth < args.depth:
+                print("Page depth: %d" % (currentDepth))
+                # get unprocessed URLs
+                urls = get_urls(conn)
             
-            pool.map(process_url, urls)
-            pool.wait_completion()
-            currentDepth += 1
-        else:
-            print("Finishing up")
-            urls = get_urls()
-            pool.map(process_url_status, urls)
-            pool.wait_completion()
-        
-        # Export report
-        report = get_error_urls()
-        if report is not None:
-            with open("report.log", "w") as f:
-                print(report, file=f)
+                #TODO must pass connection
+                pool.map(process_url, urls)
+                pool.wait_completion()
+                currentDepth += 1
+            else:
+                print("Finishing up")
+                urls = get_urls(conn)
+
+                #TODO must pass connection
+                pool.map(process_url_status, urls)
+                pool.wait_completion()
+            
+            # Export report
+            report = get_error_urls(conn)
+            if report is not None:
+                with open("report.log", "w") as f:
+                    print(report, file=f)
+        finally:
+            conn.close()
     else:
         print("Invalid URL paremeter provded.")
 
