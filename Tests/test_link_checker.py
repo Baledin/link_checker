@@ -105,16 +105,9 @@ def test_initialize_db():
 
 def test_parse_content():
     logging.info("***** test_parse_content starting *****")
-    base = "sos.wa.gov"
-    url = "https://www.sos.wa.gov/library"
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
     }
-
-    page = requests.get(url, headers=headers, allow_redirects=True)
-    html = page.text
-
-    logging.info(lc.parse_content(url, html))
     logging.info("***** test_parse_content complete *****")
 
 def test_process_url():
