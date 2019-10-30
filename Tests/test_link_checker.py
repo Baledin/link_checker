@@ -31,12 +31,12 @@ def unit_add_link():
     conn = lc.get_connection(':memory:')
     lc.initialize_db(conn)
 
-    url_id = lc.add_url(test_url, conn)
+    url_id = lc.add_url(conn, test_url)
 
     r = random.randint(3, 10)
     logging.info("unit_add_link looping %d times." % r)
     for _ in range(r):
-        lc.add_link(url_id, url_id, conn)
+        lc.add_link(conn, url_id, url_id)
 
     c = conn.cursor()
     c.execute(''' SELECT url_count FROM links WHERE parent_id=? AND child_id=? ''', [url_id, url_id])
@@ -61,7 +61,7 @@ def unit_add_url():
     lc.initialize_db(conn)
     url = test_url
 
-    url_id = lc.add_url(url, conn)
+    url_id = lc.add_url(conn, url)
 
     try:
         assert url_id > 0

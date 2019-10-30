@@ -44,14 +44,15 @@ def main():
         
         conn = get_connection()
         initialize_db(conn)
-        conn.close()
 
         args.base = set() if args.base is None else {args.base}
 
         for url in args.url:
             args.base.add(parse.urlsplit(url).hostname)
-            add_url(url)
-            
+            add_url(conn, url)
+
+        conn.close()
+
         currentDepth = 0
         while args.depth == 0 or currentDepth < args.depth:
             print("Page depth: %d" % (currentDepth))
@@ -78,8 +79,7 @@ def main():
     else:
         print("Invalid URL paremeter provded.")
 
-def add_link(parent, child, conn = None):
-    conn = get_connection() if conn is None else conn
+def add_link(conn, parent, child):
     cursor = conn.cursor()
 
     try:
@@ -98,7 +98,7 @@ def add_link(parent, child, conn = None):
 
     return False
 
-def add_url(url, conn = None):
+def add_url(conn, url):
     conn = get_connection() if conn is None else conn
     cursor = conn.cursor()
     urlId = 0
