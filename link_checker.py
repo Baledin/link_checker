@@ -186,14 +186,15 @@ def get_urls(conn):
     return urls
 
 def initialize_db(conn, reset = False):
-    logging.info("Initializing database tables")
     try:
         # Create url table if not exists
         cursor = conn.cursor()
 
         if reset:
+            logging.info("Resetting database tables")
             cursor.executescript('DROP TABLE IF EXISTS links; DROP TABLE IF EXISTS url;')
-
+        
+        logging.info("Initializing database tables")
         cursor.executescript('''
             CREATE TABLE IF NOT EXISTS url (url_id INTEGER PRIMARY KEY, url TEXT NOT NULL, status TEXT);
             CREATE TABLE IF NOT EXISTS links (parent_id INTEGER, child_id INTEGER, url_count INTEGER, PRIMARY KEY(parent_id, child_id), FOREIGN KEY (parent_id) REFERENCES url (url_id), FOREIGN KEY (child_id) REFERENCES url (url_id));
