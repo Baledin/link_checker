@@ -142,7 +142,6 @@ def get_error_urls(conn):
         print("Database error: %s" % e)
     
     result = cursor.fetchall()
-    conn.close()
 
     return result
 
@@ -173,7 +172,6 @@ def get_urls(conn):
         cursor = conn.cursor()
         cursor.execute('SELECT url FROM url WHERE status IS NULL ORDER BY url;')
         urls = cursor.fetchall()
-        conn.close()
     except sqlite3.Error as e:
         print("Database error: %s" % e)
 
