@@ -242,7 +242,6 @@ def process_url(url, get_content = True, conn = None):
             for link in links:
                 childId = add_url(conn, link)
                 add_link(conn, parentId, childId)
-                conn.close()
     else:
         page = get_header(url)
         status = 0 if page is None else page.status_code
@@ -250,6 +249,7 @@ def process_url(url, get_content = True, conn = None):
         update_url_status(url, status)
     
     time.sleep(page.elapsed.total_seconds() * random.randint(1, 5))
+    conn.close()
 
 def process_url_status(url):
     # Wrapper for process_url, setting parse_content to false
