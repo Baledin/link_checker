@@ -12,6 +12,7 @@ lc = link_checker
 test_url = "https://www.sos.wa.gov/library"
 
 def main():
+    unit_reset()
     unit_add_link()
     unit_add_url()
     unit_get_error_urls()
@@ -122,6 +123,13 @@ def unit_process_url_status():
     #TODO
     assert True
     logging.info("***** unit_process_url_status complete *****")
+
+def unit_reset():
+    logging.info("***** unit_reset starting *****")
+    conn = lc.get_connection()
+    lc.initialize_db(conn)
+    lc.reset()
+    logging.info("***** unit_reset complete *****")
 
 def unit_update_url_status():
     logging.info("***** unit_update_url_status starting *****")

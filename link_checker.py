@@ -1,6 +1,7 @@
 import argparse
 from bs4 import BeautifulSoup
 import logging
+import os
 import random
 import requests
 import sqlite3
@@ -14,9 +15,11 @@ from Include.ThreadPool import ThreadPool
 requests.urllib3.disable_warnings(requests.urllib3.exceptions.InsecureRequestWarning)
 
 args = None
+info_log = "link_checker.log"
+report_log = "report.log"
 
 def main():
-    global args
+    global args, info_log, report_log
 
     argParser = argparse.ArgumentParser(description="%(prog)s is a general broken link checker. Returns a list of broken URLs, their parent URL, and number of instances on the parent page.")
     argParser.add_argument("url", nargs="+", help="The URL(s) which will be the starting point for crawling to DEPTH levels deep.")
@@ -24,15 +27,23 @@ def main():
     argParser.add_argument("-u", "--user-agent", default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36 link_checker/0.9", help="Alternative User-Agent to use with requests.get() headers")
     argParser.add_argument("-b", "--base", help="Alternative hostnames for crawling. By default, only URLs matching the full hostname provided by URL is checked for additional links to crawl. By setting Base, you can add additional hostnames that will be considered for link checking.")
     argParser.add_argument("-t", "--threads", type=int, default=4, help="Sets the number of concurrent threads that can be processed at one time. Be aware that increasing thread count will increase the frequency of requests to the server.")
-    #argParser.add_argument("-r", "--reset", action="store_true", help="Resets local links database, restarting crawl. Default (no flag) continues where previous crawl completed.")
+    argParser.add_argument("-r", "--reset", action="store_true", help="Resets local links database, restarting crawl. Default (no flag) continues where previous crawl completed.")
+    argParser.add_argument("--report-file", default="report.log", help="Filename of final report. Defaults to report.log")
     argParser.add_argument("-l", "--log-level", default="WARNING", choices=["CRITICAL", "DEBUG", "ERROR", "INFO", "WARNING"], help="Log level to report in %(prog)s.log.")
+    argParser.add_argument("--log-file", default="%(prog)s.log", help="Filename of informational log. Defaults to %(prog)s.log.")
     args = argParser.parse_args()
+
+    info_log = args.log_file
+    report_log = args.report_file
 
     logging.basicConfig(
         level=args.log_level,
-        filename="link_checker.log", 
+        filename=info_log, 
         format="%(asctime)s\t%(levelname)s\t%(message)s")
     logging.info("***** link_checker started *****")
+
+    if args.reset:
+        reset()
 
     check = True
     for url in args.url:
@@ -57,8 +68,6 @@ def main():
                 print("Page depth: %d" % (currentDepth))
                 # get unprocessed URLs
                 urls = get_urls(conn)
-            
-                #TODO must pass connection
                 pool.map(process_url, urls)
                 pool.wait_completion()
                 currentDepth += 1
@@ -251,6 +260,40 @@ def process_url(url, get_content = True, conn = None):
 def process_url_status(url):
     # Wrapper for process_url, setting parse_content to false
     process_url(url, False)
+
+def reset():
+    logging.info("Resetting application.")
+    reset_db()
+    reset_info_log()
+    reset_report_log()
+
+def reset_db():
+    logging.info("Resetting local database.")
+    conn = get_connection()
+    conn.cursor().executescript('DROP TABLE IF EXISTS links; DROP TABLE IF EXISTS url;')
+    conn.close()
+
+def reset_info_log():
+    if os.path.exists(info_log):
+        try:
+            os.remove(info_log)
+            logging.info("Information log removed.")
+        except:
+            logging.error("Unable to remove information log.")
+            pass
+    else:
+        logging.info("Information log not found.")
+
+def reset_report_log():
+    if os.path.exists(report_log):
+        try:
+            os.remove(report_log)
+            logging.info("Report log removed.")
+        except:
+            logging.info("Unable to remove report log.")
+            pass
+    else:
+        logging.info("Report log not found.")
 
 def update_url_status(url, status, conn = None):
     conn = get_connection() if conn is None else conn
