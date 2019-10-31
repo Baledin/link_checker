@@ -64,14 +64,14 @@ def main():
         try:
             currentDepth = 0
             while args.depth == 0 or currentDepth < args.depth:
-                print("Page depth: %d" % (currentDepth))
+                logging.info("Current page depth: %d" % (currentDepth))
                 # get unprocessed URLs
                 urls = get_urls(conn)
                 pool.map(process_url, urls)
                 pool.wait_completion()
                 currentDepth += 1
             else:
-                print("Finishing up")
+                logging.info("Finishing up")
                 urls = get_urls(conn)
 
                 #TODO must pass connection
@@ -86,7 +86,7 @@ def main():
         finally:
             conn.close()
     else:
-        print("Invalid URL paremeter provded.")
+        logging.error("Invalid URL paremeter provded.")
 
 def add_link(conn, parent, child):
     cursor = conn.cursor()
@@ -147,7 +147,7 @@ def get_error_urls(conn):
             ORDER BY child
             ''')
     except sqlite3.Error as e:
-        print("Database error: %s" % e)
+        logging.error("Database error: %s" % e)
     
     result = cursor.fetchall()
 
@@ -181,7 +181,7 @@ def get_urls(conn):
         cursor.execute('SELECT url FROM url WHERE status IS NULL ORDER BY url;')
         urls = cursor.fetchall()
     except sqlite3.Error as e:
-        print("Database error: %s" % e)
+        logging.error("Database error: %s" % e)
 
     return urls
 
@@ -203,7 +203,7 @@ def initialize_db(conn, reset = False):
             ''')
         conn.commit()
     except sqlite3.Error as e:
-        print("Database error: %s" % e)
+        logging.error("Database error: %s" % e)
         return False
     
     return True
@@ -215,7 +215,7 @@ def parse_content(base, content):
     refs = soup.find_all("a", href=True)
     for a in refs:
         link = parse.urljoin(base, a['href'], False)
-        print("Found: " + link)
+        logging.info("Found: " + link)
         if validate_url(link):
             links.append(link)
 
@@ -267,7 +267,7 @@ def update_url_status(url, status, conn = None):
         # value already exists, skip
         pass
     except sqlite3.Error as e:
-        print("Database error: %s" % e)
+        logging.error("Database error: %s" % e)
     
     conn.close()   
 
