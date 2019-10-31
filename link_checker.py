@@ -24,7 +24,7 @@ def main():
     argParser.add_argument("-u", "--user-agent", default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36 link_checker/0.9", help="Alternative User-Agent to use with requests.get() headers")
     argParser.add_argument("-b", "--base", help="Alternative hostnames for crawling. By default, only URLs matching the full hostname provided by URL is checked for additional links to crawl. By setting Base, you can add additional hostnames that will be considered for link checking.")
     argParser.add_argument("-t", "--threads", type=int, default=4, help="Sets the number of concurrent threads that can be processed at one time. Be aware that increasing thread count will increase the frequency of requests to the server.")
-    argParser.add_argument("-r", "--reset", action="store_true", help="Resets local links database, restarting crawl. Default (no flag) continues where previous crawl completed.")
+    #argParser.add_argument("-r", "--reset", action="store_true", help="Resets local links database, restarting crawl. Default (no flag) continues where previous crawl completed.")
     argParser.add_argument("-l", "--log-level", default="WARNING", choices=["CRITICAL", "DEBUG", "ERROR", "INFO", "WARNING"], help="Log level to report in %(prog)s.log.")
     args = argParser.parse_args()
 
@@ -234,11 +234,11 @@ def process_url(url, get_content = True, conn = None):
 
             links = parse_content(url, page.text)
 
-            parentId = add_url(url, conn) # Inserts URL if necessary, returns Id
+            parentId = add_url(conn, url) # Inserts URL if necessary, returns Id
 
             for link in links:
-                childId = add_url(link, conn)
-                add_link(parentId, childId, conn)
+                childId = add_url(conn, link)
+                add_link(conn, parentId, childId)
                 conn.close()
     else:
         page = get_header(url)
