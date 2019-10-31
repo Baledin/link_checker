@@ -27,7 +27,7 @@ def main():
     argParser.add_argument("-u", "--user-agent", default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36 link_checker/0.9", help="Alternative User-Agent to use with requests.get() headers")
     argParser.add_argument("-b", "--base", help="Alternative hostnames for crawling. By default, only URLs matching the full hostname provided by URL is checked for additional links to crawl. By setting Base, you can add additional hostnames that will be considered for link checking.")
     argParser.add_argument("-t", "--threads", type=int, default=4, help="Sets the number of concurrent threads that can be processed at one time. Be aware that increasing thread count will increase the frequency of requests to the server.")
-    argParser.add_argument("-r", "--reset", action="store_true", help="Resets local links database, restarting crawl. Default (no flag) continues where previous crawl completed.")
+    argParser.add_argument("-r", "--reset", action="store_true", help="Resets logs and local links database, restarting crawl. Default (no flag) continues where previous crawl completed.")
     argParser.add_argument("--report-file", default=report_log, help="Filename of final report. Defaults to %s" % report_log)
     argParser.add_argument("-l", "--log-level", default="WARNING", choices=["CRITICAL", "DEBUG", "ERROR", "INFO", "WARNING"], help="Log level to report in %s." % info_log)
     argParser.add_argument("--log-file", default=info_log, help="Filename of informational log. Defaults to %s." % info_log)
@@ -39,11 +39,10 @@ def main():
     logging.basicConfig(
         level=args.log_level,
         filename=info_log, 
+        filemode= "w" if args.reset else "a",
         format="%(asctime)s\t%(levelname)s\t%(message)s")
     logging.info("***** link_checker started *****")
-
-    if args.reset:
-        reset()
+    logging.debug(args)
 
     check = True
     for url in args.url:
@@ -54,7 +53,7 @@ def main():
         pool = ThreadPool(args.threads)
         
         conn = get_connection()
-        initialize_db(conn)
+        initialize_db(conn, args.reset)
 
         args.base = set() if args.base is None else {args.base}
 
@@ -186,27 +185,21 @@ def get_urls(conn):
 
     return urls
 
-def initialize_db(conn):
+def initialize_db(conn, reset = False):
     logging.info("Initializing database tables")
     try:
         # Create url table if not exists
         cursor = conn.cursor()
-        cursor.execute(''' CREATE TABLE IF NOT EXISTS url (
-            url_id INTEGER PRIMARY KEY, 
-            url TEXT NOT NULL, 
-            status TEXT); ''')
-        cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS urls ON url(url);')
-        conn.commit()
 
-        # Create links table if not exists
-        cursor.execute(''' CREATE TABLE IF NOT EXISTS links (
-            parent_id INTEGER, 
-            child_id INTEGER,
-            url_count INTEGER,
-            PRIMARY KEY(parent_id, child_id), 
-            FOREIGN KEY (parent_id) REFERENCES url (url_id), 
-            FOREIGN KEY (child_id) REFERENCES url (url_id)); ''')
-        cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS mapping ON links(parent_id, child_id);')
+        if reset:
+            cursor.executescript('DROP TABLE IF EXISTS links; DROP TABLE IF EXISTS url;')
+
+        cursor.executescript('''
+            CREATE TABLE IF NOT EXISTS url (url_id INTEGER PRIMARY KEY, url TEXT NOT NULL, status TEXT);
+            CREATE TABLE IF NOT EXISTS links (parent_id INTEGER, child_id INTEGER, url_count INTEGER, PRIMARY KEY(parent_id, child_id), FOREIGN KEY (parent_id) REFERENCES url (url_id), FOREIGN KEY (child_id) REFERENCES url (url_id));
+            CREATE UNIQUE INDEX IF NOT EXISTS urls ON url(url);
+            CREATE UNIQUE INDEX IF NOT EXISTS mapping ON links(parent_id, child_id);
+            ''')
         conn.commit()
     except sqlite3.Error as e:
         print("Database error: %s" % e)
@@ -260,40 +253,6 @@ def process_url(url, get_content = True, conn = None):
 def process_url_status(url):
     # Wrapper for process_url, setting parse_content to false
     process_url(url, False)
-
-def reset():
-    logging.info("Resetting application.")
-    reset_db()
-    reset_info_log()
-    reset_report_log()
-
-def reset_db():
-    logging.info("Resetting local database.")
-    conn = get_connection()
-    conn.cursor().executescript('DROP TABLE IF EXISTS links; DROP TABLE IF EXISTS url;')
-    conn.close()
-
-def reset_info_log():
-    if os.path.exists(info_log):
-        try:
-            os.remove(info_log)
-            logging.info("Information log removed.")
-        except:
-            logging.error("Unable to remove information log.")
-            pass
-    else:
-        logging.info("Information log not found.")
-
-def reset_report_log():
-    if os.path.exists(report_log):
-        try:
-            os.remove(report_log)
-            logging.info("Report log removed.")
-        except:
-            logging.info("Unable to remove report log.")
-            pass
-    else:
-        logging.info("Report log not found.")
 
 def update_url_status(url, status, conn = None):
     conn = get_connection() if conn is None else conn
