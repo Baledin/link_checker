@@ -29,7 +29,7 @@ def main():
     argParser.add_argument("-t", "--threads", type=int, default=4, help="Sets the number of concurrent threads that can be processed at one time. Be aware that increasing thread count will increase the frequency of requests to the server.")
     argParser.add_argument("-r", "--reset", action="store_true", help="Resets logs and local links database, restarting crawl. Default (no flag) continues where previous crawl completed.")
     argParser.add_argument("--report-file", default=report_log, help="Filename of final report. Defaults to %s" % report_log)
-    argParser.add_argument("-l", "--log-level", default="WARNING", choices=["CRITICAL", "DEBUG", "ERROR", "INFO", "WARNING"], help="Log level to report in %s." % info_log)
+    argParser.add_argument("-l", "--log-level", default="WARNING", choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"], help="Log level to report in %s." % info_log)
     argParser.add_argument("--log-file", default=info_log, help="Filename of informational log. Defaults to %s." % info_log)
     args = argParser.parse_args()
 
