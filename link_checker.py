@@ -120,7 +120,7 @@ def add_url(conn, url):
         conn.commit()
         urlId = cursor.lastrowid
     except sqlite3.IntegrityError as e:
-        logging.info("URL '%s' already found in database." % link)
+        logging.warning("URL '%s' already found in database." % link)
         cursor.execute('SELECT url_id FROM url WHERE url=?', [link])
         result = cursor.fetchone()
         urlId = result[0]
@@ -191,7 +191,7 @@ def initialize_db(conn, reset = False):
         cursor = conn.cursor()
 
         if reset:
-            logging.info("Resetting database tables")
+            logging.warning("Resetting database tables")
             cursor.executescript('DROP TABLE IF EXISTS links; DROP TABLE IF EXISTS url;')
         
         logging.info("Initializing database tables")
@@ -280,7 +280,7 @@ def validate_url(url):
             logging.info("URL is valid: %s" % url)
             return True
         else:
-            logging.info("URL is malformed: %s" % url)
+            logging.warning("URL is malformed: %s" % url)
             logging.debug(result)
             return False
     except Exception as ex:
