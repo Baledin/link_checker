@@ -248,7 +248,8 @@ def process_url(url, get_content = True, conn = None):
 
         update_url_status(url, status)
     
-    time.sleep(page.elapsed.total_seconds() * random.randint(1, 5))
+    if page is not None:
+        time.sleep(page.elapsed.total_seconds() * random.randint(1, 5))
     conn.close()
 
 def process_url_status(url):
