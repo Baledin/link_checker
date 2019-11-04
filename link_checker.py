@@ -196,7 +196,7 @@ def initialize_db(conn, reset = False):
         
         logging.info("Initializing database tables")
         cursor.executescript('''
-            CREATE TABLE IF NOT EXISTS url (url_id INTEGER PRIMARY KEY, url TEXT NOT NULL, status TEXT);
+            CREATE TABLE IF NOT EXISTS url (url_id INTEGER PRIMARY KEY, url TEXT NOT NULL, status TEXT, notes TEXT);
             CREATE TABLE IF NOT EXISTS links (parent_id INTEGER, child_id INTEGER, url_count INTEGER, PRIMARY KEY(parent_id, child_id), FOREIGN KEY (parent_id) REFERENCES url (url_id), FOREIGN KEY (child_id) REFERENCES url (url_id));
             CREATE UNIQUE INDEX IF NOT EXISTS urls ON url(url);
             CREATE UNIQUE INDEX IF NOT EXISTS mapping ON links(parent_id, child_id);
