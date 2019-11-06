@@ -1,5 +1,6 @@
 import argparse
 from bs4 import BeautifulSoup
+from contextlib import closing
 import logging
 import os
 import random
@@ -50,36 +51,39 @@ def main():
         check = check if validate_url(url) else False
 
     if check:
-        # Initialize variables/db
-        pool = ThreadPool(args.threads)
-        
-        conn = get_connection()
-        initialize_db(args.reset)
-
-        args.base = set() if args.base is None else {args.base}
-
-        for url in args.url:
-            args.base.add(parse.urlsplit(url).hostname)
-            add_url(url)
-
         try:
+            # Initialize variables/db
+            pool = ThreadPool(args.threads)
+            args.base = set() if args.base is None else {args.base}
+            conn = get_connection()
+            initialize_db(conn, args.reset)
+
+            for url in args.url:
+                args.base.add(parse.urlsplit(url).hostname)
+                add_url(conn, url)
+
             currentDepth = 0
             while args.depth == 0 or currentDepth < args.depth:
                 logging.info("Current page depth: %d" % (currentDepth))
                 # get unprocessed URLs
-                urls = get_urls()
-                pool.map(process_url, urls)
+                urls = get_urls(conn)
+
+                for url in urls:
+                    with closing(get_connection()) as tconn:
+                        pool.add_task(process_url, (tconn, url, True))
                 pool.wait_completion()
                 currentDepth += 1
             else:
                 logging.info("Finishing up")
-                urls = get_urls()
-                pool.map(process_url_status, urls)
+                urls = get_urls(conn)
+                for url in urls:
+                    with closing(get_connection()) as tconn:
+                        pool.add_task(process_url, (tconn, url, False))
                 pool.wait_completion()
             
             # Export report
             logging.info("Creating link report.")
-            results = get_error_urls()
+            results = get_error_urls(conn)
             with open("report.log", "w") as f:
                 for result in results:
                     print(result, file=f)
@@ -88,65 +92,48 @@ def main():
     else:
         logging.error("Invalid URL paremeter provded.")
 
-def add_link(parent, child):
-    conn = get_connection()
-    cursor = conn.cursor()
-
+def add_link(conn, parent, child):
     try:
         logging.info("Updating links table - parent_id: %d | child_id: %d" % (parent, child))
-        cursor.execute('INSERT INTO links (parent_id, child_id, url_count) VALUES (?, ?, ?);', [parent, child, 1])
+        conn.execute('INSERT INTO links (parent_id, child_id, url_count) VALUES (?, ?, ?);', [parent, child, 1])
         conn.commit()
         return True
     except sqlite3.IntegrityError:
         logging.info("Item already exists, updating record.")
-        cursor.execute('UPDATE links SET url_count=url_count+1 WHERE parent_id=? AND child_id=?', [parent, child])
+        conn.execute('UPDATE links SET url_count=url_count+1 WHERE parent_id=? AND child_id=?', [parent, child])
         conn.commit()
         return True
     except sqlite3.Error as e:
         logging.debug("Database error: %s" % e)
         logging.critical("Database error - ensure database is writable.")
-    finally:
-        conn.close()
 
     return False
 
-def add_url(url):
-    conn = get_connection()
-    cursor = conn.cursor()
-    urlId = 0
-
+def add_url(conn, url):
     link = parse.urldefrag(url).url
     
     try:
         logging.info("Adding URL '%s' to database." % link)
-        cursor.execute('INSERT INTO url (url) VALUES (?);', [link])
+        cursor = conn.execute('INSERT INTO url (url) VALUES (?);', [link])
         conn.commit()
-        urlId = cursor.lastrowid
+        return cursor.lastrowid
     except sqlite3.IntegrityError as e:
         logging.warning("URL '%s' already found in database." % link)
         cursor.execute('SELECT url_id FROM url WHERE url=?', [link])
-        result = cursor.fetchone()
-        urlId = result[0]
-        pass
+        return cursor.fetchone()[0]
     except sqlite3.Error as e:
         logging.debug("Database error: %s" % e)
         logging.critical("Database error - ensure database is writable.")
-    finally:
-        conn.close()
-
-    return urlId
+        return None
 
 def get_connection():
     logging.info("Getting database connection: %s" % db_name)
     return sqlite3.connect(db_name)
 
-def get_error_urls():
-    conn = get_connection()
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
+def get_error_urls(conn):
     try:
-        cursor.execute(''' 
+        conn.row_factory = sqlite3.Row
+        cursor = conn.execute(''' 
             SELECT p.url AS 'parent', c.url AS 'child', url_count AS 'count', c.status 
             FROM links 
             INNER JOIN url AS p ON parent_id = p.url_id 
@@ -154,15 +141,10 @@ def get_error_urls():
             WHERE c.status != 200
             ORDER BY child;
             ''')
+        return cursor.fetchall()
     except sqlite3.Error as e:
         logging.error("Database error: %s" % e)
         exit("Database error: %s" % e)
-    finally:
-        conn.close()
-
-    result = cursor.fetchall()
-
-    return result
 
 def get_header(url):
     headers = {
@@ -184,34 +166,25 @@ def get_page(url):
     except:
         return None
 
-def get_urls():
-    conn = get_connection()
-    urls = []
-
+def get_urls(conn):
     try:
-        conn.row_factory = lambda cursor, row: row[0]
-        cursor = conn.cursor()
-        cursor.execute('SELECT url FROM url WHERE status IS NULL ORDER BY url;')
-        urls = cursor.fetchall()
+        conn.row_factory = lambda cursor, row: row["url"]
+        cursor = conn.execute('SELECT url FROM url WHERE status IS NULL ORDER BY url;')
+        return cursor.fetchall()
     except sqlite3.Error as e:
         logging.error("Database error: %s" % e)
-    finally:
-        conn.close()
+        return None
 
-    return urls
-
-def initialize_db(reset = False):
-    conn = get_connection()
-    cursor = conn.cursor()
-
+def initialize_db(conn, reset = False):
     try:
         if reset:
             logging.warning("Resetting database tables")
-            cursor.executescript('DROP TABLE IF EXISTS links; DROP TABLE IF EXISTS url;')
+            conn.executescript('DROP TABLE IF EXISTS links; DROP TABLE IF EXISTS url;')
+            conn.commit()
         
         # Create url table if not exists
         logging.info("Initializing database tables")
-        cursor.executescript('''
+        conn.executescript('''
             CREATE TABLE IF NOT EXISTS url (url_id INTEGER PRIMARY KEY, url TEXT NOT NULL, status INTEGER, parsed INTEGER, notes TEXT);
             CREATE TABLE IF NOT EXISTS links (parent_id INTEGER, child_id INTEGER, url_count INTEGER, PRIMARY KEY(parent_id, child_id), FOREIGN KEY (parent_id) REFERENCES url (url_id), FOREIGN KEY (child_id) REFERENCES url (url_id));
             CREATE UNIQUE INDEX IF NOT EXISTS urls ON url(url);
@@ -220,9 +193,7 @@ def initialize_db(reset = False):
         conn.commit()
     except sqlite3.Error as e:
         logging.error("Database error: %s" % e)
-        return False
-    finally:
-        conn.close()
+        exit("Database error, check that database is writable.")
     
     return True
 
@@ -239,7 +210,7 @@ def parse_content(base, content):
 
     return links
 
-def process_url(url, get_content = True):
+def process_url(conn, url, get_content = True):
     # Fetch head or head + contents for each URL, save status_code to database
     if parse.urlsplit(url).hostname in args.base:
         page = get_page(url)
@@ -248,39 +219,31 @@ def process_url(url, get_content = True):
         if (get_content 
             and status == 200 and 
             "text/html" in page.headers['content-type']):
-            update_url_status(url, status, 1)
-
+            
+            update_url_status(conn, url, status, 1)
             links = parse_content(url, page.text)
-
-            parentId = add_url(url) # Inserts URL if necessary, returns Id
+            parentId = add_url(conn, url) # Inserts URL if necessary, returns Id
 
             for link in links:
-                childId = add_url(link)
-                add_link(parentId, childId)
+                childId = add_url(conn, link)
+                add_link(conn, parentId, childId)
     else:
-        update_url_status(url, status, 0)
+        update_url_status(conn, url, status, 0)
         page = get_header(url)
         status = 0 if page is None else page.status_code
 
-        update_url_status(url, status, 0)
+        update_url_status(conn, url, status, 0)
     
     if page is not None:
         time.sleep(page.elapsed.total_seconds() * random.randint(1, 5))
-
-def process_url_status(url):
-    # Wrapper for process_url, setting parse_content to false
-    process_url(url, False)
 
 def set_db(filename):
     global db_name
     db_name = filename
 
-def update_url_status(url, status, parsed):
-    conn = get_connection()
-    cursor = conn.cursor()
-
+def update_url_status(conn, url, status, parsed):
     try:    
-        cursor.execute('UPDATE url SET status=?, parsed=? WHERE url=?;', [status, parsed, url])
+        cursor = conn.execute('UPDATE url SET status=?, parsed=? WHERE url=?;', [status, parsed, url])
         if cursor.rowcount > 0:
             conn.commit()
     except sqlite3.IntegrityError:
@@ -288,8 +251,6 @@ def update_url_status(url, status, parsed):
         pass
     except sqlite3.Error as e:
         logging.error("Database error: %s" % e)
-    finally:
-        conn.close()   
 
 def validate_url(url):
     logging.info("Validating URL: %s" % str(url))
