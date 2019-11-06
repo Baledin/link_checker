@@ -1,7 +1,9 @@
+from contextlib import closing
 import link_checker
 import logging
 import random
 import requests
+import sqlite3
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -9,71 +11,72 @@ logging.basicConfig(
     filemode="w", 
     format="%(asctime)s\t%(levelname)s\t%(message)s")
 lc = link_checker
-lc.set_db(":memory:")
 test_url = "https://www.sos.wa.gov/library"
 
 def main():
-    unit_add_link()
-    unit_add_url()
-    unit_get_error_urls()
-    unit_get_header()
-    unit_get_page()
-    unit_get_urls()
-    unit_initialize_db()
-    unit_parse_content()
-    unit_process_url()
-    unit_process_url_status()
-    unit_update_url_status()
-    unit_validate_url()
+    lc.set_db(":memory:")
+    with closing(lc.get_connection()) as conn:
+        # Database methods
+        unit_initialize_db(conn)
+        unit_add_url(conn)
+        unit_add_link(conn)
 
-def unit_add_link():
+        # Utility methods
+        unit_get_header()
+        unit_get_page()
+        unit_parse_content()
+
+        # Untested
+        unit_get_error_urls()
+        unit_get_urls()
+        unit_process_url()
+        unit_process_url_no_parse()
+        unit_update_url_status()
+        unit_validate_url()
+
+def unit_add_link(conn):
     logging.info("***** unit_add_link starting *****")
-    # Initialize if not already set
+
+    if lc.initialize_db(conn, True):
+        logging.info("Database initialized.")
+    else:
+        logging.critical("Database failed to initialize.")
+        exit()
+
+    url_id = lc.add_url(conn, test_url)
+
+    r = random.randint(3, 10)
+    logging.info("unit_add_link looping %d times." % r)
+    for _ in range(r):
+        lc.add_link(conn, url_id, url_id)
+
     
-    conn = lc.get_connection()
-    lc.initialize_db()
+    c = conn.execute(''' SELECT url_count FROM links WHERE parent_id=? AND child_id=? ''', [url_id, url_id])
+    result = c.fetchone()
 
+    # As add_link iterates counter, result should be equal to number of loops
     try:
-        url_id = lc.add_url(test_url)
-
-        r = random.randint(3, 10)
-        logging.info("unit_add_link looping %d times." % r)
-        for _ in range(r):
-            lc.add_link(url_id, url_id)
-
-        c = conn.cursor()
-        c.execute(''' SELECT url_count FROM links WHERE parent_id=? AND child_id=? ''', [url_id, url_id])
-        result = c.fetchone()
-
-        # As add_link iterates counter, result should be equal to number of loops
-        try:
-            assert result[0] == r
-            logging.info("unit_add_link passed - %d expected, %d found." % (r, result[0]))
-        except AssertionError as e:
-            logging.error("unit_add_link failed - %d expected, %d found." % (r, result[0]))
-            logging.debug(e)
-    finally:
-        conn.close()
+        assert result[0] == r
+        logging.info("unit_add_link passed - %d expected, %d found." % (r, result[0]))
+    except AssertionError as e:
+        logging.error("unit_add_link failed - %d expected, %d found." % (r, result[0]))
+        logging.debug(e)
 
     logging.info("***** unit_add_link complete *****")
 
-def unit_add_url():
+def unit_add_url(conn):
     logging.info("***** unit_add_url starting *****")
     
-    # Initialize db if not already set
-    conn = lc.get_connection()
-    lc.initialize_db()
+    # Initialize db
+    lc.initialize_db(conn, True)
     url = test_url
-
-    url_id = lc.add_url(url)
+    url_id = lc.add_url(conn, url)
 
     try:
         assert url_id > 0
         logging.info("unit_add_url passed - %s added to db." % url)
     except AssertionError:
         logging.info("unit_add_url failed - %s not found." % url)
-    finally:
-        conn.close()
     
     logging.info("***** unit_add_url complete *****")
 
@@ -101,10 +104,28 @@ def unit_get_urls():
     assert True
     logging.info("***** unit_get_urls complete *****")
 
-def unit_initialize_db():
+def unit_initialize_db(conn):
     logging.info("***** unit_initialize_db starting *****")
-    #TODO
-    assert True
+    try:
+        assert lc.initialize_db(conn, True)
+    except AssertionError as ex:
+        logging.critical("Database initialization failed.")
+        logging.error(str(ex))
+        exit("unit_initiallize_db failed, check debug log.")
+
+    try:
+        tables = ('links', 'url') # list must be in alpha order
+        result = conn.execute('''
+            SELECT tbl_name 
+            FROM "main".sqlite_master 
+            WHERE type='table'
+            ORDER BY tbl_name;
+            ''').fetchall()
+        for i in range(len(tables)):
+            assert tables[i] == result[i][0], logging.debug("Comparing %s to %s." % (tables[i], result[i][0]))
+    except Exception as ex:
+        logging.error(str(ex))
+        exit("Table selection failed.")
     logging.info("***** unit_initialize_db complete *****")
 
 def unit_parse_content():
@@ -122,7 +143,7 @@ def unit_process_url():
     assert True
     logging.info("***** unit_process_url complete *****")
 
-def unit_process_url_status():
+def unit_process_url_no_parse():
     logging.info("***** unit_process_url_status starting *****")
     #TODO
     assert True
