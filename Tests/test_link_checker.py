@@ -11,16 +11,16 @@ logging.basicConfig(
     filemode="w", 
     format="%(asctime)s\t%(levelname)s\t%(message)s")
 lc = link_checker
-test_url = "https://www.sos.wa.gov/library"
+test_url = "https://www.sos.wa.gov/library/"
 
 def main():
-    lc.set_db(":memory:")
+    lc.set_db("tests.db")
     with closing(lc.get_connection()) as conn:
         # Database methods
         unit_initialize_db(conn)
         unit_add_url(conn)
         unit_add_link(conn)
-        unit_get_error_urls()
+        unit_get_error_urls(conn)
         unit_get_urls()
         unit_process_url()
         unit_process_url_no_parse()
@@ -47,7 +47,6 @@ def unit_add_link(conn):
     logging.info("unit_add_link looping %d times." % r)
     for _ in range(r):
         lc.add_link(conn, url_id, url_id)
-
     
     c = conn.execute(''' SELECT url_count FROM links WHERE parent_id=? AND child_id=? ''', [url_id, url_id])
     result = c.fetchone()
@@ -78,10 +77,35 @@ def unit_add_url(conn):
     
     logging.info("***** unit_add_url complete *****")
 
-def unit_get_error_urls():
+def unit_get_error_urls(conn):
     logging.info("***** unit_get_error_urls starting *****")
-    #TODO
-    assert True
+    lc.initialize_db(conn, True)
+
+    total_urls=9
+    error_urls=0
+
+    # Initialize urls
+    for i in range(total_urls):
+        url = test_url + str(i)
+        lc.add_url(conn, url)
+        r = random.randint(0, 1)
+        error_urls = error_urls + r
+        status_code = 404 if r else 200
+        lc.update_url_status(conn, url, status_code, 0)
+
+    # Add to links table
+    for i in range(1, total_urls):
+        lc.add_link(conn, 1, i)
+
+    result = lc.get_error_urls(conn)
+    try:
+        print(error_urls)
+        print(result)
+        exit()
+        assert len(result)
+    except AssertionError as ex:
+        print(ex)
+
     logging.info("***** unit_get_error_urls complete *****")
 
 def unit_get_header():

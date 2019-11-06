@@ -127,6 +127,7 @@ def get_connection():
 
 def get_error_urls(conn):
     try:
+        logging.info("Fetching URLs with error status.")
         conn.row_factory = sqlite3.Row
         cursor = conn.execute(''' 
             SELECT p.url AS 'parent', c.url AS 'child', url_count AS 'count', c.status 
@@ -237,12 +238,14 @@ def set_db(filename):
     db_name = filename
 
 def update_url_status(conn, url, status, parsed):
-    try:    
+    try:
+        logging.info("Updating %s | status: %d | parsed: %d" % (url, status, parsed))
         cursor = conn.execute('UPDATE url SET status=?, parsed=? WHERE url=?;', [status, parsed, url])
         if cursor.rowcount > 0:
             conn.commit()
+            logging.info("Record updated.")
     except sqlite3.IntegrityError:
-        # value already exists, skip
+        logging.warning("Integrity error updating status.")
         pass
     except sqlite3.Error as e:
         logging.error("Database error: %s" % e)
