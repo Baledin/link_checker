@@ -20,18 +20,16 @@ def main():
         unit_initialize_db(conn)
         unit_add_url(conn)
         unit_add_link(conn)
-
-        # Utility methods
-        unit_get_header()
-        unit_get_page()
-        unit_parse_content()
-
-        # Untested
         unit_get_error_urls()
         unit_get_urls()
         unit_process_url()
         unit_process_url_no_parse()
         unit_update_url_status()
+
+        # Utility methods
+        unit_get_header()
+        unit_get_page()
+        unit_parse_content()
         unit_validate_url()
 
 def unit_add_link(conn):
