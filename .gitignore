@@ -2,6 +2,6 @@ __pycache__/
 Lib/
 Scripts/
 pyvenv.cfg
-tmp_links.db
 .vscode/
+*.db
 *.log
