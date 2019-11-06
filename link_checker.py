@@ -46,51 +46,46 @@ def main():
     logging.info("***** link_checker started *****")
     logging.debug(args)
 
-    check = True
-    for url in args.url:
-        check = check if validate_url(url) else False
-
-    if check:
-        try:
-            # Initialize variables/db
-            pool = ThreadPool(args.threads)
-            args.base = set() if args.base is None else {args.base}
-            conn = get_connection()
-            initialize_db(conn, args.reset)
-
-            for url in args.url:
-                args.base.add(parse.urlsplit(url).hostname)
-                add_url(conn, url)
-
-            currentDepth = 0
-            while args.depth == 0 or currentDepth < args.depth:
-                logging.info("Current page depth: %d" % (currentDepth))
-                # get unprocessed URLs
-                urls = get_urls(conn)
-
-                for url in urls:
-                    with closing(get_connection()) as tconn:
-                        pool.add_task(process_url, (tconn, url, True))
-                pool.wait_completion()
-                currentDepth += 1
-            else:
-                logging.info("Finishing up")
-                urls = get_urls(conn)
-                for url in urls:
-                    with closing(get_connection()) as tconn:
-                        pool.add_task(process_url, (tconn, url, False))
-                pool.wait_completion()
-            
-            # Export report
-            logging.info("Creating link report.")
-            results = get_error_urls(conn)
-            with open("report.log", "w") as f:
-                for result in results:
-                    print(result, file=f)
-        finally:
-            conn.close()
-    else:
+    if not all(validate_url(url) for url in args.url):
         logging.error("Invalid URL paremeter provded.")
+        exit("Please enter valid URL(s)")
+
+    with closing(get_connection()) as conn:
+        # Initialize variables/db
+        pool = ThreadPool(args.threads)
+        args.base = set() if args.base is None else {args.base}
+        
+        initialize_db(conn, args.reset)
+
+        for url in args.url:
+            args.base.add(parse.urlsplit(url).hostname)
+            add_url(conn, url)
+
+        currentDepth = 0
+        while args.depth == 0 or currentDepth < args.depth:
+            logging.info("Current page depth: %d" % (currentDepth))
+            # get unprocessed URLs
+            urls = get_urls(conn)
+
+            for url in urls:
+                with closing(get_connection()) as tconn:
+                    pool.add_task(process_url, (tconn, url, True))
+            pool.wait_completion()
+            currentDepth += 1
+        else:
+            logging.info("Finishing up")
+            urls = get_urls(conn)
+            for url in urls:
+                with closing(get_connection()) as tconn:
+                    pool.add_task(process_url, (tconn, url, False))
+            pool.wait_completion()
+        
+        # Export report
+        logging.info("Creating link report.")
+        results = get_error_urls(conn)
+        with open("report.log", "w") as f:
+            for result in results:
+                print(result, file=f)
 
 def add_link(conn, parent, child):
     try:
