@@ -9,6 +9,7 @@ logging.basicConfig(
     filemode="w", 
     format="%(asctime)s\t%(levelname)s\t%(message)s")
 lc = link_checker
+lc.set_db(":memory:")
 test_url = "https://www.sos.wa.gov/library"
 
 def main():
@@ -28,28 +29,31 @@ def main():
 def unit_add_link():
     logging.info("***** unit_add_link starting *****")
     # Initialize if not already set
-    conn = lc.get_connection(':memory:')
-    lc.initialize_db(conn)
+    
+    conn = lc.get_connection()
+    lc.initialize_db()
 
-    url_id = lc.add_url(conn, test_url)
-
-    r = random.randint(3, 10)
-    logging.info("unit_add_link looping %d times." % r)
-    for _ in range(r):
-        lc.add_link(conn, url_id, url_id)
-
-    c = conn.cursor()
-    c.execute(''' SELECT url_count FROM links WHERE parent_id=? AND child_id=? ''', [url_id, url_id])
-    result = c.fetchone()
-    conn.close()
-
-    # As add_link iterates counter, result should be equal to number of loops
     try:
-        assert result[0] == r
-        logging.info("unit_add_link passed - %d expected, %d found." % (r, result[0]))
-    except AssertionError as e:
-        logging.error("unit_add_link failed - %d expected, %d found." % (r, result[0]))
-        logging.debug(e)
+        url_id = lc.add_url(test_url)
+
+        r = random.randint(3, 10)
+        logging.info("unit_add_link looping %d times." % r)
+        for _ in range(r):
+            lc.add_link(url_id, url_id)
+
+        c = conn.cursor()
+        c.execute(''' SELECT url_count FROM links WHERE parent_id=? AND child_id=? ''', [url_id, url_id])
+        result = c.fetchone()
+
+        # As add_link iterates counter, result should be equal to number of loops
+        try:
+            assert result[0] == r
+            logging.info("unit_add_link passed - %d expected, %d found." % (r, result[0]))
+        except AssertionError as e:
+            logging.error("unit_add_link failed - %d expected, %d found." % (r, result[0]))
+            logging.debug(e)
+    finally:
+        conn.close()
 
     logging.info("***** unit_add_link complete *****")
 
@@ -57,24 +61,25 @@ def unit_add_url():
     logging.info("***** unit_add_url starting *****")
     
     # Initialize db if not already set
-    conn = lc.get_connection(':memory:')
-    lc.initialize_db(conn)
+    conn = lc.get_connection()
+    lc.initialize_db()
     url = test_url
 
-    url_id = lc.add_url(conn, url)
+    url_id = lc.add_url(url)
 
     try:
         assert url_id > 0
         logging.info("unit_add_url passed - %s added to db." % url)
     except AssertionError:
         logging.info("unit_add_url failed - %s not found." % url)
-
-    conn.close()
+    finally:
+        conn.close()
     
     logging.info("***** unit_add_url complete *****")
 
 def unit_get_error_urls():
     logging.info("***** unit_get_error_urls starting *****")
+    #TODO
     assert True
     logging.info("***** unit_get_error_urls complete *****")
 
