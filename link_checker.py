@@ -11,7 +11,7 @@ import validators
 
 from Include.ThreadPool import ThreadPool
 
-# Ignore SSL warnings, just need to know if page returns result
+# Ignores SSL warnings, just need to know if page returns result
 requests.urllib3.disable_warnings(requests.urllib3.exceptions.InsecureRequestWarning)
 
 args = None
@@ -196,7 +196,7 @@ def initialize_db(conn, reset = False):
         
         logging.info("Initializing database tables")
         cursor.executescript('''
-            CREATE TABLE IF NOT EXISTS url (url_id INTEGER PRIMARY KEY, url TEXT NOT NULL, status TEXT, notes TEXT);
+            CREATE TABLE IF NOT EXISTS url (url_id INTEGER PRIMARY KEY, url TEXT NOT NULL, status INTEGER, parsed INTEGER, notes TEXT);
             CREATE TABLE IF NOT EXISTS links (parent_id INTEGER, child_id INTEGER, url_count INTEGER, PRIMARY KEY(parent_id, child_id), FOREIGN KEY (parent_id) REFERENCES url (url_id), FOREIGN KEY (child_id) REFERENCES url (url_id));
             CREATE UNIQUE INDEX IF NOT EXISTS urls ON url(url);
             CREATE UNIQUE INDEX IF NOT EXISTS mapping ON links(parent_id, child_id);
@@ -221,19 +221,16 @@ def parse_content(base, content):
 
     return links
 
-def process_url(url, get_content = True, conn = None):
-    conn = get_connection() if conn is None else conn
-
+def process_url(url, get_content = True):
     # Fetch head or head + contents for each URL, save status_code to database
     if parse.urlsplit(url).hostname in args.base:
         page = get_page(url)
         status = 0 if page is None else page.status_code
-        
-        update_url_status(url, status)
 
         if (get_content 
             and status == 200 and 
             "text/html" in page.headers['content-type']):
+            update_url_status(url, status, 1)
 
             links = parse_content(url, page.text)
 
@@ -243,10 +240,11 @@ def process_url(url, get_content = True, conn = None):
                 childId = add_url(conn, link)
                 add_link(conn, parentId, childId)
     else:
+        update_url_status(url, status, 0)
         page = get_header(url)
         status = 0 if page is None else page.status_code
 
-        update_url_status(url, status)
+        update_url_status(url, status, 0)
     
     if page is not None:
         time.sleep(page.elapsed.total_seconds() * random.randint(1, 5))
