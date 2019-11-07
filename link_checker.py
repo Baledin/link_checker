@@ -133,13 +133,13 @@ def add_url(url):
         
         try:
             logging.info("Adding URL '%s' to database." % link)
-            cursor = conn.execute('INSERT INTO url (url) VALUES (?);', [link])
+            c = conn.execute('INSERT INTO url (url) VALUES (?);', [link])
             conn.commit()
-            return cursor.lastrowid
+            return c.lastrowid
         except sqlite3.IntegrityError as e:
             logging.warning("URL '%s' already found in database." % link)
-            cursor.execute('SELECT url_id FROM url WHERE url=?', [link])
-            return cursor.fetchone()[0]
+            c = conn.execute('SELECT url_id FROM url WHERE url=?', [link])
+            return c.fetchone()[0]
         except sqlite3.Error as e:
             logging.debug("Database error: %s" % e)
             logging.critical("Database error - ensure database is writable.")
@@ -160,7 +160,7 @@ def get_error_urls():
                 INNER JOIN url AS p ON parent_id = p.url_id 
                 INNER JOIN url AS c ON child_id = c.url_id 
                 WHERE c.status != 200
-                ORDER BY child;
+                ORDER BY parent, c.status, child;
                 ''')
             return cursor.fetchall()
     except sqlite3.Error as e:
@@ -202,14 +202,12 @@ def initialize_db(reset = False):
         try:
             if reset:
                 logging.warning("Resetting database tables")
-                c = conn.cursor()
-                c.executescript('DROP TABLE IF EXISTS links; DROP TABLE IF EXISTS url;')
+                conn.executescript('DROP TABLE IF EXISTS links; DROP TABLE IF EXISTS url;')
                 conn.commit()
             
             # Create url table if not exists
             logging.info("Initializing database tables")
-            c = conn.cursor()
-            c.executescript('''
+            conn.executescript('''
                 CREATE TABLE IF NOT EXISTS url (url_id INTEGER PRIMARY KEY, url TEXT NOT NULL, status INTEGER, parsed INTEGER, notes TEXT);
                 CREATE TABLE IF NOT EXISTS links (parent_id INTEGER, child_id INTEGER, url_count INTEGER, PRIMARY KEY(parent_id, child_id), FOREIGN KEY (parent_id) REFERENCES url (url_id), FOREIGN KEY (child_id) REFERENCES url (url_id));
                 CREATE UNIQUE INDEX IF NOT EXISTS urls ON url(url);
