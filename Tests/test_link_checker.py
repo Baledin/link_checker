@@ -85,26 +85,23 @@ def unit_get_error_urls(conn):
     error_urls=0
 
     # Initialize urls
-    for i in range(total_urls):
+    for i in range(1, total_urls):
         url = test_url + str(i)
         lc.add_url(conn, url)
         r = random.randint(0, 1)
         error_urls = error_urls + r
         status_code = 404 if r else 200
         lc.update_url_status(conn, url, status_code, 0)
-
-    # Add to links table
-    for i in range(1, total_urls):
         lc.add_link(conn, 1, i)
 
     result = lc.get_error_urls(conn)
     try:
-        print(error_urls)
-        print(result)
-        exit()
-        assert len(result)
+        for row in result:
+            print(row)
+        assert len(result) == error_urls
     except AssertionError as ex:
-        print(ex)
+        logging.critical("unit_get_error_urls failed: %d | %s" % (error_urls, str(result)))
+        logging.debug(ex)
 
     logging.info("***** unit_get_error_urls complete *****")
 
