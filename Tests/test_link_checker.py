@@ -82,25 +82,30 @@ def unit_get_error_urls(conn):
     lc.initialize_db(conn, True)
 
     total_urls=9
-    error_urls=0
+    error_urls=[]
 
-    # Initialize urls
+    # Initialize urls, url should match child from get_error_urls
     for i in range(1, total_urls):
         url = test_url + str(i)
         lc.add_url(conn, url)
         r = random.randint(0, 1)
-        error_urls = error_urls + r
-        status_code = 404 if r else 200
+        status_code = 200
+        if r:
+            error_urls.append(url)
+            status_code = 404
         lc.update_url_status(conn, url, status_code, 0)
         lc.add_link(conn, 1, i)
 
-    result = lc.get_error_urls(conn)
     try:
-        for row in result:
-            print(row)
-        assert len(result) == error_urls
+        results = lc.get_error_urls(conn)
+        error_urls.sort()
+        if len(results) == len(error_urls):
+            for i in range(len(results)):
+                assert error_urls[i] == results[i]['child']
+        else:
+            logging.critical("unit_get_error_urls failed: wrong number of rows returned. Expected %d, found %d." % (len(error_urls), len(results)))
     except AssertionError as ex:
-        logging.critical("unit_get_error_urls failed: %d | %s" % (error_urls, str(result)))
+        logging.critical("unit_get_error_urls failed: expected child %s | received %s" % (error_urls[i], results[i]['child']))
         logging.debug(ex)
 
     logging.info("***** unit_get_error_urls complete *****")
