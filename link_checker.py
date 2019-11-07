@@ -246,13 +246,13 @@ def process_url(url, get_content = True):
         page = get_header(url)
 
     status = 0 if page is None else page.status_code
+    parentId = add_url(url) # Inserts URL if necessary, returns Id
     update_url_status(url, status, get_content)
 
     if (get_content 
         and status == 200 and 
         "text/html" in page.headers['content-type']):
         links = parse_content(url, page.text)
-        parentId = add_url(url) # Inserts URL if necessary, returns Id
 
         for link in links:
             childId = add_url(link)
