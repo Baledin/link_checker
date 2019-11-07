@@ -82,21 +82,34 @@ def main():
     logging.info("Creating link report.")
     results = get_error_urls()
     with open(report_log, "w") as f:
-        print("<html><body><table>", file=f)
-        print("<thead><tr>", file=f)
-        print("<td>Parent URL</td>", file=f)
-        print("<td>Error URL</td>", file=f)
-        print("<td># Found</td>", file=f)
-        print("<td>HTTP Code</td>", file=f)
-        print("</tr></thead>", file=f)
+        print("<html>", file=f)
+        print("<head>", file=f)
+        print("<style>", file=f)
+        print("    h1 { font-size: 1.2em; }", file=f)
+        print("    li { vertical-align: top; max-width: 80vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }", file=f)
+        print("    .status { display: inline-block; width: 30px; color: red; margin-right: 1em; text-align: right; }", file=f)
+        print("</style>", file=f)
+        print("</head>", file=f)
+        print("<body>", file=f)
+        heading = ""
+        ignore_status = [401, 405, 500, 503]
         for result in results:
-            print("<tr>", file=f)
-            print("<td>" + result['parent'] + "</td>", file=f)
-            print("<td>" + result['child'] + "</td>", file=f)
-            print("<td>" + result['count'] + "</td>", file=f)
-            print("<td>" + result['status'] + "</td>", file=f)
-            print("</tr>", file=f)
-        print("</table></body></html>", file=f)
+            if result['status'] in ignore_status:
+                # Access forbidden, ignore
+                continue
+
+            if heading != result['parent']:
+                if heading != "":
+                    print("</ul>", file=f)
+                print("<h1><a href='{url}' target='_blank'>{url}</a></h1>".format(url=result['parent']), file=f)
+                print("<ul>", file=f)
+                heading = result['parent']
+
+            print("<li><span class='status'>{status}</span><a href='{url}' target='_blank'>{url}</a></li>".format(url=result['child'], status=result['status']), file=f)
+            
+        print("</ul>", file=f) # Close final list
+        print("</body>", file=f)
+        print("</html>", file=f)
     webbrowser.open('file://' + os.path.realpath(report_log), new=2)
 
 def add_link(parent, child):
