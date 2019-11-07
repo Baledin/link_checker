@@ -187,7 +187,7 @@ def unit_validate_url():
 
     invalid_urls = (
         "//fredhutchcenter.com", 
-        3,
+        "3",
         "notanaddress", 
         "http://localhost:[903]"
         )
