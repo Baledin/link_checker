@@ -67,6 +67,9 @@ def main():
         # get unprocessed URLs
         urls = get_urls()
 
+        if len(urls) == 0:
+            break
+
         for url in urls:
             pool.add_task(process_url, url, True)
         pool.wait_completion()
