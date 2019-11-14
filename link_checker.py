@@ -170,23 +170,11 @@ def get_error_urls():
         logging.error("Database error: %s" % e)
         exit("Database error: %s" % e)
 
-def get_header(url):
-    headers = {
-        "User-Agent": args.user_agent
-    }
-
-    try:
-        return requests.head(url, headers=headers, allow_redirects=True, verify=False)
-    except:
-        return None
-
 def get_page(url):
-    headers = {
-        "User-Agent": args.user_agent
-    }
+    headers = { "User-Agent": args.user_agent }
 
     try:
-        return requests.get(url, headers=headers, allow_redirects=True, verify=False)
+        return requests.get(url, headers=headers, allow_redirects=True, verify=False, stream=True)
     except:
         return None
 
@@ -239,20 +227,16 @@ def parse_content(base, content):
 def process_url(url, get_content = True):
     # Fetch head or head + contents for each URL, save status_code to database
     logging.info("Processing Url: %s. get_content is %s" % (url, str(get_content)))
-    page = None
 
-    if parse.urlsplit(url).hostname in args.base:
-        page = get_page(url)
-    else:
-        page = get_header(url)
-
+    page = get_page(url)
     status = 0 if page is None else page.status_code
     parentId = add_url(url) # Inserts URL if necessary, returns Id
     update_url_status(url, status, get_content)
 
-    if (get_content 
-        and status == 200 and 
-        "text/html" in page.headers['content-type']):
+    if (parse.urlsplit(url).hostname in args.base
+        and get_content 
+        and status == 200 
+        and "text/html" in page.headers['content-type']):
         links = parse_content(url, page.text)
 
         for link in links:
