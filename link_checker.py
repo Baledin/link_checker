@@ -68,6 +68,7 @@ def main():
         urls = get_urls()
 
         if len(urls) == 0:
+            logging.info("No URLs to check, exiting main loop.")
             break
 
         for url in urls:
@@ -75,7 +76,6 @@ def main():
         pool.wait_completion()
         currentDepth += 1
     else:
-        logging.info("Finishing up")
         urls = get_urls()
         for url in urls:
             pool.add_task(process_url, url, False)
