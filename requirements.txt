@@ -1,4 +1,4 @@
-lxml==4.4.1
+#lxml==4.4.1
 requests==2.21.0
 BeautifulSoup4==4.8.0
 validators==0.14.0

@@ -14,12 +14,14 @@ import webbrowser
 from Include.ThreadPool import ThreadPool
 
 # Ignores SSL warnings, just need to know if page returns result
-requests.urllib3.disable_warnings(requests.urllib3.exceptions.InsecureRequestWarning)
+requests.urllib3.disable_warnings(
+    requests.urllib3.exceptions.InsecureRequestWarning)
 
 args = None
 db_name = "links.db"
 info_log = "link_checker.log"
 report_log = "report.html"
+
 
 def main():
     global args, info_log, report_log
@@ -33,7 +35,7 @@ def main():
     argParser.add_argument("-r", "--reset", action="store_true", help="Resets logs and local links database, restarting crawl. Default (no flag) continues where previous crawl completed.")
     argParser.add_argument("--report-file", default=report_log, help="Filename of final report. Defaults to %s" % report_log)
     argParser.add_argument("-l", "--log-level", default="INFO", choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"], help="Log level to report in %s." % info_log)
-    argParser.add_argument("--log-file", default=info_log, help="Filename of informational log. Defaults to %s." % info_log)
+    argParser.add_argument("--log-file", default=info_log,help="Filename of informational log. Defaults to %s." % info_log)
     args = argParser.parse_args()
 
     info_log = args.log_file
@@ -41,8 +43,8 @@ def main():
 
     logging.basicConfig(
         level=args.log_level,
-        filename=info_log, 
-        filemode= "w" if args.reset else "a",
+        filename=info_log,
+        filemode="w+" if args.reset else "a",
         format="%(asctime)s\t%(levelname)s\t%(message)s")
     logging.info("***** link_checker started *****")
     logging.debug(args)
@@ -54,14 +56,17 @@ def main():
     # Initialize variables/db
     pool = ThreadPool(args.threads)
     args.base = set() if args.base is None else {args.base}
-    
+
     initialize_db(args.reset)
 
+    # Process initial URLs
     for url in args.url:
         args.base.add(parse.urlsplit(url).hostname)
-        add_url(url)
+        pool.add_task(process_url, url, True)
 
-    currentDepth = 0
+    pool.wait_completion()
+
+    currentDepth = 1
     while args.depth == 0 or currentDepth < args.depth:
         logging.info("Current page depth: %d" % currentDepth)
         # get unprocessed URLs
@@ -80,7 +85,7 @@ def main():
         for url in urls:
             pool.add_task(process_url, url, False)
         pool.wait_completion()
-    
+
     # Export report
     logging.info("Creating link report.")
     results = get_error_urls()
@@ -90,7 +95,8 @@ def main():
         print("<style>", file=f)
         print("    h1 { font-size: 1.2em; }", file=f)
         print("    li { vertical-align: top; max-width: 80vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }", file=f)
-        print("    .status { display: inline-block; width: 30px; color: red; margin-right: 1em; text-align: right; }", file=f)
+        print(
+            "    .status { display: inline-block; width: 30px; color: red; margin-right: 1em; text-align: right; }", file=f)
         print("</style>", file=f)
         print("</head>", file=f)
         print("<body>", file=f)
@@ -104,25 +110,31 @@ def main():
             if heading != result['parent']:
                 if heading != "":
                     print("</ul>", file=f)
-                print("<h1><a href='{url}' target='_blank'>{url}</a></h1>".format(url=result['parent']), file=f)
+                print(
+                    "<h1><a href='{url}' target='_blank'>{url}</a></h1>".format(url=result['parent']), file=f)
                 print("<ul>", file=f)
                 heading = result['parent']
 
-            print("<li><span class='status'>{status}</span><a href='{url}' target='_blank'>{url}</a></li>".format(url=result['child'], status=result['status']), file=f)
-            
-        print("</ul>", file=f) # Close final list
+            print("<li><span class='status'>{status}</span><a href='{url}' target='_blank'>{url}</a></li>".format(
+                url=result['child'], status=result['status']), file=f)
+
+        print("</ul>", file=f)  # Close final list
         print("</body>", file=f)
         print("</html>", file=f)
     webbrowser.open('file://' + os.path.realpath(report_log), new=2)
 
+
 def add_link(parent, child):
     with closing(get_connection()) as conn:
         try:
-            logging.info("Updating links table - parent_id: %d | child_id: %d" % (parent, child))
-            conn.execute('INSERT INTO links (parent_id, child_id, url_count) VALUES (?, ?, ?);', [parent, child, 1])
+            logging.info(
+                "Updating links table - parent_id: %d | child_id: %d" % (parent, child))
+            conn.execute('INSERT INTO links (parent_id, child_id, url_count) VALUES (?, ?, ?);', [
+                         parent, child, 1])
         except sqlite3.IntegrityError:
             logging.info("Item already exists, updating record.")
-            conn.execute('UPDATE links SET url_count=url_count+1 WHERE parent_id=? AND child_id=?', [parent, child])
+            conn.execute(
+                'UPDATE links SET url_count=url_count+1 WHERE parent_id=? AND child_id=?', [parent, child])
         except sqlite3.Error as e:
             logging.debug("Database error: %s" % e)
             logging.critical("Database error - ensure database is writable.")
@@ -130,10 +142,11 @@ def add_link(parent, child):
         conn.commit()
     return True
 
+
 def add_url(url):
     with closing(get_connection()) as conn:
         link = parse.urldefrag(url).url
-        
+
         try:
             logging.info("Adding URL '%s' to database." % link)
             c = conn.execute('INSERT INTO url (url) VALUES (?);', [link])
@@ -148,9 +161,11 @@ def add_url(url):
             logging.critical("Database error - ensure database is writable.")
             return None
 
+
 def get_connection():
     logging.info("Getting database connection: %s" % db_name)
     return sqlite3.connect(db_name)
+
 
 def get_error_urls():
     try:
@@ -162,7 +177,7 @@ def get_error_urls():
                 FROM links 
                 INNER JOIN url AS p ON parent_id = p.url_id 
                 INNER JOIN url AS c ON child_id = c.url_id 
-                WHERE c.status != 200
+                WHERE c.status > 403 OR c.status = 0
                 ORDER BY parent, c.status, child;
                 ''')
             return cursor.fetchall()
@@ -170,32 +185,37 @@ def get_error_urls():
         logging.error("Database error: %s" % e)
         exit("Database error: %s" % e)
 
+
 def get_page(url):
-    headers = { "User-Agent": args.user_agent }
+    headers = {"User-Agent": args.user_agent}
 
     try:
         return requests.get(url, headers=headers, allow_redirects=True, verify=False, stream=True)
     except:
         return None
 
+
 def get_urls():
     with closing(get_connection()) as conn:
         try:
             conn.row_factory = lambda cursor, row: row[0]
-            cursor = conn.execute('SELECT url FROM url WHERE status IS NULL ORDER BY url;')
+            cursor = conn.execute(
+                'SELECT url FROM url WHERE status IS NULL ORDER BY url;')
             return cursor.fetchall()
         except sqlite3.Error as e:
             logging.error("Database error: %s" % e)
             return None
 
-def initialize_db(reset = False):
+
+def initialize_db(reset=False):
     with closing(get_connection()) as conn:
         try:
             if reset:
                 logging.warning("Resetting database tables")
-                conn.executescript('DROP TABLE IF EXISTS links; DROP TABLE IF EXISTS url;')
+                conn.executescript(
+                    'DROP TABLE IF EXISTS links; DROP TABLE IF EXISTS url;')
                 conn.commit()
-            
+
             # Create url table if not exists
             logging.info("Initializing database tables")
             conn.executescript('''
@@ -208,12 +228,13 @@ def initialize_db(reset = False):
         except sqlite3.Error as e:
             logging.error("Database error: %s" % e)
             exit("Database error, check that database is writable.")
-        
+
     return True
+
 
 def parse_content(base, content):
     soup = BeautifulSoup(content, "html.parser")
-    
+
     links = []
     refs = soup.find_all("a", href=True)
     for a in refs:
@@ -224,37 +245,62 @@ def parse_content(base, content):
 
     return links
 
-def process_url(url, get_content = True):
+
+def process_url(url, get_content=True):
     # Fetch head or head + contents for each URL, save status_code to database
-    logging.info("Processing Url: %s. get_content is %s" % (url, str(get_content)))
+    logging.info("Processing Url: %s. get_content is %s" %
+                 (url, str(get_content)))
 
-    page = get_page(url)
-    status = 0 if page is None else page.status_code
-    parentId = add_url(url) # Inserts URL if necessary, returns Id
-    update_url_status(url, status, get_content)
+    # TODO: Find out why page is not getting updated in DB
+    # Accept URL input and get page
+    #page = get_page(url)
+    with get_page(url) as page:
 
-    if (parse.urlsplit(url).hostname in args.base
-        and get_content 
-        and status == 200 
-        and "text/html" in page.headers['content-type']):
-        links = parse_content(url, page.text)
+        # add url to db
+        parentId = add_url(url)  # Inserts URL if necessary, returns Id
 
-        for link in links:
-            childId = add_url(link)
-            add_link(parentId, childId)
+        # Handle pages which don't resolve
+        if page is None:
+            update_url_status(parentId, 0, False)
+            return
 
-    if page is not None:
+        # get status code of url
+        status = page.status_code
+
+        # update status of current page
+        update_url_status(parentId, status, get_content)
+
+        # if page.history (??) then add each page and status code to db, add page.url (the final redirected url) to db
+        if len(page.history) > 0:
+            update_url_status(add_url(page.url), page.status_code, get_content)
+
+        # if current url is in args.base, and get_content, and url status code is OK, finally page is of the appropriate type, then scrape page for new links
+        # for each link, add to the url, returning child ID, add to links table
+        if (parse.urlsplit(url).hostname in args.base
+            and get_content
+            and status == 200
+                and "text/html" in page.headers['content-type']):
+            links = parse_content(url, page.text)
+
+            for link in links:
+                childId = add_url(link)
+                add_link(parentId, childId)
+
         time.sleep(page.elapsed.total_seconds() * random.randint(1, 5))
+
 
 def set_db(filename):
     global db_name
     db_name = filename
 
-def update_url_status(url, status, parsed):
+
+def update_url_status(url_id, status, parsed):
     with closing(get_connection()) as conn:
         try:
-            logging.info("Updating %s | status: %d | parsed: %d" % (url, status, parsed))
-            cursor = conn.execute('UPDATE url SET status=?, parsed=? WHERE url=?;', [status, parsed, url])
+            logging.info("Updating %d | status: %d | parsed: %d" %
+                         (url_id, status, parsed))
+            cursor = conn.execute('UPDATE url SET status=?, parsed=? WHERE url_id=?;', [
+                                  status, parsed, url_id])
             if cursor.rowcount > 0:
                 conn.commit()
                 logging.info("Record updated.")
@@ -263,6 +309,7 @@ def update_url_status(url, status, parsed):
             pass
         except sqlite3.Error as e:
             logging.error("Database error: %s" % e)
+
 
 def validate_url(url):
     logging.info("Validating URL: %s" % str(url))
@@ -279,6 +326,7 @@ def validate_url(url):
     except Exception as ex:
         logging.debug(ex)
         return False
+
 
 if __name__ == "__main__":
     main()
