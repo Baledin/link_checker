@@ -28,7 +28,7 @@ def main():
 
     argParser = argparse.ArgumentParser(description="%(prog)s is a general broken link checker. Returns a list of broken URLs, their parent URL, and number of instances on the parent page.")
     argParser.add_argument("url", nargs="+", help="The URL(s) which will be the starting point for crawling to DEPTH levels deep.")
-    argParser.add_argument("-d", "--depth", type=int, default=1, help="Maximum degrees of separation of pages to crawl. 0 for unlimited depth")
+    argParser.add_argument("-d", "--depth", type=int, default=1, help="Maximum degrees of separation of pages to crawl. 0 for unlimited depth, defaults to 1 level.")
     argParser.add_argument("-u", "--user-agent", default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36 link_checker/0.9", help="Alternative User-Agent to use with requests.get() headers")
     argParser.add_argument("-b", "--base", help="Alternative hostnames for crawling. By default, only URLs matching the full hostname provided by URL is checked for additional links to crawl. By setting Base, you can add additional hostnames that will be considered for link checking.")
     argParser.add_argument("-t", "--threads", type=int, default=4, help="Sets the number of concurrent threads that can be processed at one time. Be aware that increasing thread count will increase the frequency of requests to the server.")
