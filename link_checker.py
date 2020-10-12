@@ -31,7 +31,10 @@ def main():
     argParser.add_argument("-d", "--depth", type=int, default=1, help="Maximum degrees of separation of pages to crawl. 0 for unlimited depth, defaults to 1 level.")
     argParser.add_argument("-u", "--user-agent", default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36 link_checker/0.9", help="Alternative User-Agent to use with requests.get() headers")
     argParser.add_argument("-b", "--base", help="Alternative hostnames for crawling. By default, only URLs matching the full hostname provided by URL is checked for additional links to crawl. By setting Base, you can add additional hostnames that will be considered for link checking.")
-    argParser.add_argument("-t", "--threads", type=int, default=4, help="Sets the number of concurrent threads that can be processed at one time. Be aware that increasing thread count will increase the frequency of requests to the server.")
+    argParser.add_argument("-nq", "--no-query", action="store_true", help="Ignore the query portion of the url.")
+    #TODO: Clarify this help
+    argParser.add_argument("-ak", "--acceptable-keys", nargs="+", help="Acceptable query Keys for comparing URLs, any unspeccified keys will be ignored.")
+    argParser.add_argument("-t", "--threads", type=int, default=2, help="Sets the number of concurrent threads that can be processed at one time. Be aware that increasing thread count will increase the frequency of requests to the server.")
     argParser.add_argument("-r", "--reset", action="store_true", help="Resets logs and local links database, restarting crawl. Default (no flag) continues where previous crawl completed.")
     argParser.add_argument("--report-file", default=report_log, help="Filename of final report. Defaults to %s" % report_log)
     argParser.add_argument("-l", "--log-level", default="INFO", choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"], help="Log level to report in %s." % info_log)
