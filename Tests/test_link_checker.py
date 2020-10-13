@@ -7,7 +7,7 @@ import sqlite3
 
 logging.basicConfig(
     level=logging.DEBUG,
-    filename="link_checker-debug.log", 
+    filename="link_checker_debug.log", 
     filemode="w", 
     format="%(asctime)s\t%(levelname)s\t%(message)s")
 lc = link_checker
@@ -18,7 +18,7 @@ def main():
 
     # Database methods
     unit_initialize_db()
-    unit_add_url()
+    unit_add_url_to_db()
     unit_add_link()
     unit_get_error_urls()
     unit_get_urls()
@@ -42,7 +42,7 @@ def unit_add_link():
             logging.critical("Database failed to initialize.")
             exit()
 
-        url_id = lc.add_url(test_url)
+        url_id = lc.add_url_to_db(test_url)
 
         r = random.randint(3, 10)
         logging.info("unit_add_link looping %d times." % r)
@@ -62,21 +62,21 @@ def unit_add_link():
 
         logging.info("***** unit_add_link complete *****")
 
-def unit_add_url():
-    logging.info("***** unit_add_url starting *****")
+def unit_add_url_to_db():
+    logging.info("***** unit_add_url_to_db starting *****")
     
     # Initialize db
     lc.initialize_db(True)
     url = test_url
-    url_id = lc.add_url(url)
+    url_id = lc.add_url_to_db(url)
 
     try:
         assert url_id > 0
-        logging.info("unit_add_url passed - %s added to db." % url)
+        logging.info("unit_add_url_to_db passed - %s added to db." % url)
     except AssertionError:
-        logging.info("unit_add_url failed - %s not found." % url)
+        logging.info("unit_add_url_to_db failed - %s not found." % url)
     
-    logging.info("***** unit_add_url complete *****")
+    logging.info("***** unit_add_url_to_db complete *****")
 
 def unit_get_error_urls():
     logging.info("***** unit_get_error_urls starting *****")
@@ -88,7 +88,7 @@ def unit_get_error_urls():
     # Initialize urls, url should match child from get_error_urls
     for i in range(1, total_urls):
         url = test_url + str(i)
-        lc.add_url(url)
+        lc.add_url_to_db(url)
         r = random.randint(0, 1)
         status_code = 200
         if r:

@@ -146,7 +146,7 @@ def add_link(parent, child):
     return True
 
 
-def add_url(url):
+def add_url_to_db(url):
     with closing(get_connection()) as conn:
         link = parse.urldefrag(url).url
 
@@ -260,7 +260,7 @@ def process_url(url, get_content=True):
     with get_page(url) as page:
 
         # add url to db
-        parentId = add_url(url)  # Inserts URL if necessary, returns Id
+        parentId = add_url_to_db(url)  # Inserts URL if necessary, returns Id
 
         # Handle pages which don't resolve
         if page is None:
@@ -275,7 +275,7 @@ def process_url(url, get_content=True):
 
         # if page.history (??) then add each page and status code to db, add page.url (the final redirected url) to db
         if len(page.history) > 0:
-            update_url_status(add_url(page.url), page.status_code, get_content)
+            update_url_status(add_url_to_db(page.url), page.status_code, get_content)
 
         # if current url is in args.base, and get_content, and url status code is OK, finally page is of the appropriate type, then scrape page for new links
         # for each link, add to the url, returning child ID, add to links table
@@ -286,7 +286,7 @@ def process_url(url, get_content=True):
             links = parse_content(url, page.text)
 
             for link in links:
-                childId = add_url(link)
+                childId = add_url_to_db(link)
                 add_link(parentId, childId)
 
         time.sleep(page.elapsed.total_seconds() * random.randint(1, 5))
