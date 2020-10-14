@@ -56,10 +56,11 @@ def main():
         logging.error("Invalid URL paremeter provded.")
         exit("Please enter valid URL(s)")
 
-    # Initialize variables/db
-    pool = ThreadPool(args.threads)
+    # Initialize threadpool
+    pool = ThreadPool(args.threads if args.threads > 0 else 1)
+    
+    # Initialize database and variable
     args.base = set() if args.base is None else {args.base}
-
     initialize_db(args.reset)
 
     # Process initial URLs
@@ -244,9 +245,34 @@ def parse_content(base, content):
         link = parse.urljoin(base, a['href'], False)
         logging.info("Found: " + link)
         if validate_url(link):
-            links.append(link)
+            links.append(parse_url(link, not args.no_query, args.acceptable_keys))
 
     return links
+
+
+def parse_url(url, use_queries=True, keys=[]):
+    splitresult = parse.urlsplit(url)
+    parsed_url = splitresult.scheme + "://" + splitresult.netloc + splitresult.path
+
+    # Modify URL based on command line arguments
+    if use_queries and not keys:
+        parsed_url = parsed_url + splitresult.query
+
+    # rebuild URL with acceptable key/value pairs only
+    if keys and splitresult.query:
+        query_args = dict(x.split("=") for x in splitresult.query.split("&"))
+        parsed_query_args = []
+        for ak in keys:
+            if ak in query_args:
+                parsed_query_args.append(ak + "=" + query_args[ak])
+        
+        if parsed_query_args:
+            parsed_url = parsed_url + "?" + "&".join(parsed_query_args)
+    
+    if url != parsed_url:
+        logging.info("Parsed URL returned: " + parsed_url)
+
+    return parsed_url
 
 
 def process_url(url, get_content=True):
@@ -254,11 +280,10 @@ def process_url(url, get_content=True):
     logging.info("Processing Url: %s. get_content is %s" %
                  (url, str(get_content)))
 
-    # TODO: Find out why page is not getting updated in DB
-    # Accept URL input and get page
-    #page = get_page(url)
-    with get_page(url) as page:
+    url = parse_url(url, not args.no_query, args.acceptable_keys)
 
+    # Accept URL input and get page
+    with get_page(url) as page:
         # add url to db
         parentId = add_url_to_db(url)  # Inserts URL if necessary, returns Id
 

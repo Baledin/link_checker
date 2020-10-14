@@ -1,6 +1,7 @@
 __pycache__/
 Lib/
 Scripts/
+env/
 pyvenv.cfg
 .vscode/
 *.db
