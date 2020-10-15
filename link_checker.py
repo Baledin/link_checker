@@ -201,7 +201,7 @@ def get_page(url):
     try:
         return requests.get(url, headers=headers, allow_redirects=True, verify=False, stream=True)
     except:
-        return None
+        return FailedResponse(url)
 
 
 def get_urls():
@@ -289,13 +289,9 @@ def process_url(url, get_content=True):
 
     # Accept URL input and get page
     with get_page(url) as page:
+
         # add url to db
         parentId = add_url_to_db(url)  # Inserts URL if necessary, returns Id
-
-        # Handle pages which don't resolve
-        if page is None:
-            update_url_status(parentId, 0, False)
-            return
 
         # get status code of url
         status = page.status_code
@@ -312,14 +308,14 @@ def process_url(url, get_content=True):
         if (parse.urlsplit(url).hostname in args.base
             and get_content
             and status == 200
-                and "text/html" in page.headers['content-type']):
+            and "text/html" in page.headers['content-type']):
             links = parse_content(url, page.text)
 
             for link in links:
                 childId = add_url_to_db(link)
                 add_link(parentId, childId)
 
-        time.sleep(page.elapsed.total_seconds() * random.randint(1, 5))
+        time.sleep(0.5 * random.randint(1, 5))
 
 
 def set_db(filename):
@@ -360,6 +356,20 @@ def validate_url(url):
         logging.debug(ex)
         return False
 
-
+class FailedResponse:
+    # Dummy class for responses that fail outright, typically due to non-existent server. Returns 404 so link shows up and can be dealt with as appropriate.
+    def __init__(self, url):
+        self.url = url
+        self.status_code = 404
+        self.history = []
+        self.headers = []
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, type, value, traceback):
+        # Just a dummy response, no need to close anything
+        return
+    
 if __name__ == "__main__":
     main()
