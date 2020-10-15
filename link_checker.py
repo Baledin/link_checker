@@ -107,8 +107,11 @@ def main():
         print("</style>", file=f)
         print("</head>", file=f)
         print("<body>", file=f)
+        print("<h1>Link_Checker Results</h1>", file=f)
         heading = ""
         ignore_status = [401, 405, 500, 503]
+        if not results:
+            print("<p>No bad links found</p>", file=f)
         for result in results:
             if result['status'] in ignore_status:
                 # Access forbidden, ignore
@@ -118,7 +121,7 @@ def main():
                 if heading != "":
                     print("</ul>", file=f)
                 print(
-                    "<h1><a href='{url}' target='_blank'>{url}</a></h1>".format(url=result['parent']), file=f)
+                    "<h2><a href='{url}' target='_blank'>{url}</a></h2>".format(url=result['parent']), file=f)
                 print("<ul>", file=f)
                 heading = result['parent']
 
