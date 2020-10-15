@@ -66,7 +66,10 @@ def main():
     # Process initial URLs
     for url in args.url:
         args.base.add(parse.urlsplit(url).hostname)
-        pool.add_task(process_url, url, True)
+        if args.threads == 0:
+            process_url(url, True)
+        else:
+            pool.add_task(process_url, url, True)
 
     pool.wait_completion()
 
